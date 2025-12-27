@@ -1,0 +1,72 @@
+{
+  "optimized_tcn_model": {
+    "model_name": "optimized_tcn_model",
+    "created_at": "2025-11-10T00:00:00.000000",
+    "status": "saved",
+    "last_saved": "2025-11-10T00:00:00.000000",
+    "best_accuracy": 97.43589743589743,
+    "test_accuracy": 100.0,
+    "labels": [
+      "2-Hay",
+      "Alifmad",
+      "Aray",
+      "Jeem"
+    ],
+    "config": {
+      "model_type": "optimized_tcn",
+      "target_seq_len": 60,
+      "sequence_length": 60,
+      "feature_size": 189,
+      "input_dim": 189,
+      "num_classes": 4,
+      "best_val_acc": 97.43589743589743,
+      "test_acc": 100.0,
+      "epochs_trained": 31,
+      "batch_size": 16,
+      "learning_rate": 0.0005,
+      "labels": [
+        "2-Hay",
+        "Alifmad",
+        "Aray",
+        "Jeem"
+      ],
+      "architecture": {
+        "num_channels": [256, 256, 256, 256, 128],
+        "kernel_size": 5,
+        "dropout": 0.4
+      }
+    }
+  },
+  "advanced_letters_4_base": {
+    "model_name": "advanced_letters_4_base",
+    "created_at": "2025-11-13T20:03:56.663228",
+    "status": "deprecated",
+    "last_saved": "2025-11-13T20:03:56.663228",
+    "best_accuracy": 43.85964912280702,
+    "labels": [
+      "2-Hay",
+      "Alifmad",
+      "Aray",
+      "Jeem"
+    ],
+    "config": {
+      "model_type": "advanced_spatiotemporal"
+    }
+  },
+  "optimal_advanced_model": {
+    "model_name": "optimal_advanced_model",
+    "created_at": "2025-11-13T21:23:57.952029",
+    "status": "deprecated",
+    "last_saved": "2025-11-13T21:24:06.390369",
+    "best_accuracy": 77.19298245614036,
+    "labels": [
+      "2-Hay",
+      "Alifmad",
+      "Aray",
+      "Jeem"
+    ],
+    "config": {
+      "model_type": "advanced_spatiotemporal_optimal"
+    }
+  }
+}

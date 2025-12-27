@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پاکستانی اشاراتی زبان شناسی - PSL Recognition</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/urdu-fonts.css">
+    <link rel="stylesheet" href="css/main.css">
+    
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1 class="title">
+                <span class="urdu">پاکستانی اشاراتی زبان شناسی</span>
+                <span class="english">PSL Recognition System</span>
+            </h1>
+            <div class="status-indicator" id="statusIndicator">
+                <span class="status-dot" id="statusDot"></span>
+                <span class="status-text" id="statusText">Connecting...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Camera Section -->
+            <section class="camera-section">
+                <div class="camera-container">
+                    <video id="webcam" autoplay muted playsinline></video>
+                    <canvas id="overlay-canvas"></canvas>
+                    <div class="camera-controls">
+                        <button id="startBtn" class="btn btn-primary">
+                            <span class="urdu">شروع کریں</span>
+                            <span class="english">Start Recognition</span>
+                        </button>
+                        <button id="stopBtn" class="btn btn-secondary" disabled>
+                            <span class="urdu">روکیں</span>
+                            <span class="english">Stop Recognition</span>
+                        </button>
+                        <button id="resetBtn" class="btn btn-outline">
+                            <span class="urdu">ری سیٹ</span>
+                            <span class="english">Reset</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section - SIMPLIFIED -->
+            <section class="results-section">
+                <div class="prediction-container">
+                    <div class="prediction-display">
+                        <h2 class="section-title">
+                            <span class="urdu">شناخت شدہ اشارہ</span>
+                            <span class="english">Current Sign</span>
+                        </h2>
+                        <div class="prediction-result" id="predictionResult">
+                            <span class="placeholder">
+                                <span class="urdu">اشارہ دکھائیں</span>
+                                <span class="english">Make a sign</span>
+                            </span>
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" id="confidenceFill"></div>
+                            <span class="confidence-text" id="confidenceText">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Settings Panel -->
+    <aside class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <h3 class="settings-title">
+                <span class="urdu">ترتیبات</span>
+                <span class="english">Settings</span>
+            </h3>
+            <button class="settings-close" id="settingsClose">&times;</button>
+        </div>
+        
+        <div class="settings-content">
+            <div class="setting-group">
+                <label class="setting-label">
+                    <span class="urdu">حساسیت</span>
+                    <span class="english">Sensitivity</span>
+                </label>
+                <input type="range" id="sensitivitySlider" min="0.1" max="0.9" step="0.1" value="0.5">
+                <span class="setting-value" id="sensitivityValue">0.5</span>
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label">
+                    <span class="urdu">فریم ریٹ</span>
+                    <span class="english">Frame Rate</span>
+                </label>
+                <select id="frameRateSelect">
+                    <option value="5">5 FPS</option>
+                    <option value="10" selected>10 FPS</option>
+                    <option value="15">15 FPS</option>
+                    <option value="20">20 FPS</option>
+                </select>
+            </div>
+            
+            <div class="setting-group">
+                <label class="setting-label">
+                    <span class="urdu">زبان</span>
+                    <span class="english">Language</span>
+                </label>
+                <select id="languageSelect">
+                    <option value="urdu" selected>اردو</option>
+                    <option value="english">English</option>
+                </select>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Settings Button -->
+    <button class="settings-toggle" id="settingsToggle">
+        <span class="urdu">ترتیبات</span>
+        <span class="english">Settings</span>
+    </button>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">
+                <span class="urdu">سسٹم تیار ہو رہا ہے...</span>
+                <span class="english">Initializing system...</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <div class="notifications" id="notifications"></div>
+
+    <!-- JavaScript -->
+    <script src="js/camera.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/visualization.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,318 @@
+/* Urdu Font Support for PSL Recognition System */
+
+/* Import Urdu fonts */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
+
+/* Urdu typography classes */
+.urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-weight: 400;
+    line-height: 1.6;
+    direction: rtl;
+    text-align: right;
+}
+
+.urdu-bold {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-weight: 700;
+    line-height: 1.6;
+    direction: rtl;
+    text-align: right;
+}
+
+.urdu-large {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-size: 2.5rem;
+    font-weight: 600;
+    line-height: 1.4;
+    direction: rtl;
+    text-align: center;
+}
+
+.urdu-medium {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.5;
+    direction: rtl;
+    text-align: center;
+}
+
+.urdu-small {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.4;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Mixed language support */
+.mixed-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.mixed-text .urdu {
+    font-size: 1.1em;
+    color: #2c3e50;
+}
+
+.mixed-text .english {
+    font-size: 0.9em;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+/* RTL layout support */
+.rtl-layout {
+    direction: rtl;
+    text-align: right;
+}
+
+.rtl-layout .flex-row {
+    flex-direction: row-reverse;
+}
+
+.rtl-layout .flex-col {
+    flex-direction: column;
+}
+
+/* Urdu button styles */
+.btn-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-weight: 500;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    direction: rtl;
+    text-align: center;
+}
+
+.btn-urdu:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Urdu input styles */
+.input-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    direction: rtl;
+    text-align: right;
+    padding: 0.75rem;
+    border: 2px solid #e1e8ed;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.input-urdu:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Urdu card styles */
+.card-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    direction: rtl;
+    text-align: right;
+}
+
+.card-urdu .card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.card-urdu .card-content {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #34495e;
+}
+
+/* Urdu notification styles */
+.notification-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    direction: rtl;
+    text-align: right;
+    padding: 1rem 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notification-urdu.success {
+    background: linear-gradient(135deg, #27ae60, #2ecc71);
+    color: white;
+}
+
+.notification-urdu.error {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+}
+
+.notification-urdu.warning {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+}
+
+.notification-urdu.info {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+}
+
+/* Urdu progress indicators */
+.progress-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    direction: rtl;
+    text-align: right;
+}
+
+.progress-urdu .progress-label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #34495e;
+    margin-bottom: 0.5rem;
+}
+
+.progress-urdu .progress-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Urdu table styles */
+.table-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    direction: rtl;
+    text-align: right;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-urdu th,
+.table-urdu td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e1e8ed;
+    text-align: right;
+}
+
+.table-urdu th {
+    font-weight: 600;
+    background: #f8f9fa;
+    color: #2c3e50;
+}
+
+.table-urdu td {
+    color: #34495e;
+}
+
+/* Responsive Urdu text */
+@media (max-width: 768px) {
+    .urdu-large {
+        font-size: 2rem;
+    }
+    
+    .urdu-medium {
+        font-size: 1.25rem;
+    }
+    
+    .urdu-small {
+        font-size: 0.85rem;
+    }
+    
+    .btn-urdu {
+        padding: 0.625rem 1.25rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* Urdu animation support */
+.urdu-fade-in {
+    animation: urduFadeIn 0.5s ease-in-out;
+}
+
+.urdu-slide-in {
+    animation: urduSlideIn 0.3s ease-out;
+}
+
+@keyframes urduFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes urduSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Urdu text selection */
+.urdu::selection {
+    background: #3498db;
+    color: white;
+}
+
+.urdu::-moz-selection {
+    background: #3498db;
+    color: white;
+}
+
+/* Urdu placeholder text */
+.placeholder-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    color: #95a5a6;
+    font-style: italic;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Urdu loading text */
+.loading-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    font-weight: 500;
+    color: #7f8c8d;
+    direction: rtl;
+    text-align: center;
+}
+
+/* Urdu error text */
+.error-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    color: #e74c3c;
+    font-weight: 500;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Urdu success text */
+.success-urdu {
+    font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
+    color: #27ae60;
+    font-weight: 500;
+    direction: rtl;
+    text-align: right;
+}
+

@@ -1,0 +1,18 @@
+# Cursor Rules for ISHARAPAL Project
+
+## File Creation Rules
+
+**CRITICAL: Do NOT create any .md (Markdown) files in this repository.**
+
+- Never create new .md files unless explicitly requested by the user
+- Do not create documentation files, README files, or any markdown files
+- If documentation is needed, use .txt files instead
+- Existing .md files should not be modified unless explicitly requested
+
+## General Guidelines
+
+- Focus on code implementation and functionality
+- Use .txt files for any documentation or notes if needed
+- Keep code changes focused and minimal
+- Follow existing code style and patterns in the repository
+

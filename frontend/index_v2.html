@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پاکستانی اشاراتی زبان شناسی - PSL Recognition System</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👋</text></svg>">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/urdu-fonts.css">
+    <link rel="stylesheet" href="css/main_v2.css">
+    
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">👋</div>
+                    <div class="title-group">
+                        <h1 class="title-main urdu">پاکستانی اشاراتی زبان</h1>
+                        <p class="title-sub">Pakistan Sign Language Recognition System</p>
+                    </div>
+                </div>
+                
+                <div class="header-status">
+                    <div class="connection-badge" id="connectionBadge" role="status" aria-live="polite">
+                        <span class="badge-dot" id="statusDot" aria-hidden="true"></span>
+                        <span class="badge-text" id="statusText">Connecting...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="workspace-grid">
+                
+                <!-- Left Column: Video Feed -->
+                <div class="video-column">
+                    <div class="video-card">
+                        <!-- Video Header - Compact -->
+                        <div class="card-header-simple">
+                            <h2 class="card-title-simple">
+                                <span class="icon">📹</span>
+                                Camera
+                            </h2>
+                            <div class="hand-detection-status" id="handStatus" role="status" aria-live="polite">
+                                <span class="status-icon" aria-hidden="true">✋</span>
+                                <span class="status-label">No hands</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Video Container -->
+                        <div class="video-container">
+                            <div class="video-wrapper">
+                                <video id="webcam" autoplay muted playsinline aria-label="Camera feed for sign language input"></video>
+                                <canvas id="overlay-canvas" aria-hidden="true"></canvas>
+                                
+                            </div>
+                            
+                            <!-- Buffer Progress Bar - Minimal -->
+                            <div class="buffer-progress-container-simple">
+                                <div class="buffer-progress-bar">
+                                    <div class="buffer-progress-fill" id="bufferFill"></div>
+                                </div>
+                                <div class="buffer-status-text-simple" id="bufferStatusText">
+                                    <span id="bufferCount">0/45</span> frames
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <div class="control-panel">
+                            <button id="startBtn" class="btn btn-start" aria-label="Start sign language recognition (Press Space or Enter)">
+                                <span class="btn-icon" aria-hidden="true">▶</span>
+                                <span class="btn-text">
+                                    <span class="urdu">شروع کریں</span>
+                                    <span class="english">Start Recognition</span>
+                                </span>
+                            </button>
+                            <button id="stopBtn" class="btn btn-stop" disabled aria-label="Stop recognition (Press Esc)">
+                                <span class="btn-icon" aria-hidden="true">⏸</span>
+                                <span class="btn-text">
+                                    <span class="urdu">روکیں</span>
+                                    <span class="english">Stop</span>
+                                </span>
+                            </button>
+                            <button id="resetBtn" class="btn btn-reset" aria-label="Reset system (Press R)">
+                                <span class="btn-icon" aria-hidden="true">↻</span>
+                                <span class="btn-text">
+                                    <span class="urdu">ری سیٹ</span>
+                                    <span class="english">Reset</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Compact Stats Bar -->
+                    <div class="stats-bar">
+                        <div class="stat-item">
+                            <span class="stat-icon">⚡</span>
+                            <span class="stat-value" id="systemStatusValue">Ready</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">📊</span>
+                            <span class="stat-value" id="signCountValue">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">⏱</span>
+                            <span class="stat-value"><span id="fpsValue">0</span> FPS</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Prediction & History -->
+                <div class="results-column">
+                    
+                    <!-- Current Prediction Card -->
+                    <div class="prediction-card">
+                        <div class="card-header-simple">
+                            <h2 class="card-title-simple">
+                                <span class="icon">✨</span>
+                                Current Sign
+                            </h2>
+                        </div>
+                        
+                        <div class="prediction-content">
+                            <!-- Prediction Display -->
+                            <div class="prediction-display" id="predictionDisplay" role="status" aria-live="assertive" aria-atomic="true">
+                                <div class="prediction-placeholder">
+                                    <div class="placeholder-icon" aria-hidden="true">👋</div>
+                                    <div class="placeholder-text">
+                                        <span class="urdu">اشارہ دکھائیں</span>
+                                        <span class="english">Show a sign to begin</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Confidence Meter - Simplified -->
+                            <div class="confidence-section-simple">
+                                <div class="confidence-header-simple">
+                                    <span class="confidence-label-simple">Confidence</span>
+                                    <span class="confidence-value" id="confidenceValue">0%</span>
+                                </div>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" id="confidenceFill"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Feedback Section -->
+                        <div class="feedback-section" id="feedbackSection" style="display: none;">
+                            <div class="feedback-header">
+                                <span class="urdu">کیا یہ صحیح ہے؟</span>
+                                <span class="english">Was this correct?</span>
+                            </div>
+                            <div class="feedback-buttons">
+                                <button id="feedbackCorrect" class="feedback-btn feedback-correct" aria-label="Mark prediction as correct (Press C)">
+                                    <span class="feedback-icon" aria-hidden="true">✓</span>
+                                    <span class="feedback-text">
+                                        <span class="urdu">صحیح</span>
+                                        <span class="english">Correct</span>
+                                    </span>
+                                </button>
+                                <button id="feedbackIncorrect" class="feedback-btn feedback-incorrect" aria-label="Mark prediction as incorrect (Press I)">
+                                    <span class="feedback-icon" aria-hidden="true">✗</span>
+                                    <span class="feedback-text">
+                                        <span class="urdu">غلط</span>
+                                        <span class="english">Incorrect</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- History Card - Compact -->
+                    <div class="history-card">
+                        <div class="card-header-simple">
+                            <h3 class="card-title-simple">
+                                <span class="icon">📝</span>
+                                Recent Signs
+                            </h3>
+                            <button class="clear-history-btn" id="clearHistoryBtn" style="display: none;">Clear</button>
+                        </div>
+                        
+                        <div class="history-content-compact">
+                            <div class="history-list" id="historyList">
+                                <div class="history-empty-simple">
+                                    <span class="english">No signs yet</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">
+                <span class="urdu">پاکستانی اشاراتی زبان شناسی نظام</span>
+                <span class="divider">|</span>
+                <span class="english">Pakistan Sign Language Recognition System v2.0</span>
+                <span class="divider">|</span>
+                <span class="english">40 Urdu Alphabet Signs</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Reconnecting Banner -->
+    <div class="reconnecting-banner" id="reconnectingBanner" style="display: none;">
+        <div class="reconnecting-content">
+            <span class="reconnecting-icon">🔄</span>
+            <span class="reconnecting-text">Connection lost. Reconnecting<span class="reconnecting-dots">...</span></span>
+            <span class="reconnecting-attempt" id="reconnectAttempt"></span>
+            <button class="reconnecting-retry-btn" id="manualReconnectBtn">Retry Now</button>
+        </div>
+    </div>
+
+    <!-- Camera Error Modal -->
+    <div class="camera-error-modal" id="cameraErrorModal" style="display: none;">
+        <div class="camera-error-content">
+            <div class="camera-error-icon">📹</div>
+            <h3 class="camera-error-title">Camera Access Required</h3>
+            <p class="camera-error-message" id="cameraErrorMessage">
+                Please allow camera access to use sign language recognition.
+            </p>
+            <div class="camera-error-actions">
+                <button class="btn btn-start" id="retryCameraBtn">
+                    <span class="btn-text">Try Again</span>
+                </button>
+                <button class="btn btn-reset" id="closeCameraErrorBtn">
+                    <span class="btn-text">Close</span>
+                </button>
+            </div>
+            <div class="camera-error-help">
+                <details>
+                    <summary>How to enable camera access</summary>
+                    <ol>
+                        <li>Click the camera icon in your browser's address bar</li>
+                        <li>Select "Allow" for camera permissions</li>
+                        <li>Refresh the page if needed</li>
+                    </ol>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p class="loading-title">
+                <span class="urdu">لوڈ ہو رہا ہے...</span>
+                <span class="english">Initializing System</span>
+            </p>
+            <p class="loading-subtitle" id="loadingProgress">
+                Loading model...
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/camera.js"></script>
+    <script src="js/websocket_v2.js"></script>
+    <script src="js/visualization.js"></script>
+    <script src="js/recording_status.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app_v2.js"></script>
+    
+    <!-- Initialize App -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = new PSLRecognitionApp();
+            app.init();
+            window.pslApp = app;
+        });
+    </script>
+</body>
+</html>
