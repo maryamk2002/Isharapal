@@ -168,6 +168,12 @@ class PSLRecognitionApp {
             // Set up word formation callbacks
             this.wordFormation.onLetterAdded = (data) => {
                 this.updateCurrentWordDisplay(data.currentWord);
+                // Add letter to history with feedback options
+                this.addLetterToHistory({
+                    urduChar: data.letter,
+                    romanized: data.romanized,
+                    confidence: this.lastDisplayedConfidence || 0.85
+                });
             };
             
             this.wordFormation.onWordComplete = (data) => {
@@ -263,8 +269,16 @@ class PSLRecognitionApp {
             clearTextBtn: document.getElementById('clearTextBtn'),
             addSpaceBtn: document.getElementById('addSpaceBtn'),
             deleteLetterBtn: document.getElementById('deleteLetterBtn'),
-            deleteWordBtn: document.getElementById('deleteWordBtn')
+            deleteWordBtn: document.getElementById('deleteWordBtn'),
+            
+            // Letter History Elements
+            letterHistoryList: document.getElementById('letterHistoryList'),
+            clearLettersBtn: document.getElementById('clearLettersBtn')
         };
+        
+        // Letter history tracking
+        this.letterHistory = [];
+        this.letterIdCounter = 0;
     }
     
     setupEventListeners() {
@@ -340,6 +354,13 @@ class PSLRecognitionApp {
                 if (this.wordFormation) {
                     this.wordFormation.deleteLastWord();
                 }
+            });
+        }
+        
+        // Clear letter history button
+        if (this.elements.clearLettersBtn) {
+            this.elements.clearLettersBtn.addEventListener('click', () => {
+                this.clearLetterHistory();
             });
         }
     }
@@ -550,6 +571,9 @@ class PSLRecognitionApp {
             if (this.wordFormation) {
                 this.wordFormation.clearAll();
             }
+            
+            // Clear letter history
+            this.clearLetterHistory();
             
             console.log('[OK] System reset');
             this.showNotification('System reset', 'info');
@@ -1170,6 +1194,41 @@ class PSLRecognitionApp {
             return;
         }
         
+        // Check if this is a letter history correction
+        if (this._pendingLetterCorrection) {
+            const letterData = this._pendingLetterCorrection;
+            const correctLabel = this._selectedCorrectLabel;
+            
+            console.log(`Letter correction: ${letterData.romanized} -> ${correctLabel}`);
+            
+            // Record feedback
+            this.feedbackManager.recordIncorrect(
+                letterData.romanized,
+                correctLabel,
+                letterData.confidence,
+                letterData.landmarks
+            );
+            
+            // Mark as done in UI
+            letterData.feedbackGiven = true;
+            const letterElement = document.getElementById(letterData.id);
+            if (letterElement) {
+                letterElement.classList.add('feedback-given', 'feedback-incorrect');
+                const btns = letterElement.querySelector('.letter-feedback-btns');
+                if (btns) btns.innerHTML = '<span class="letter-fb-done incorrect">✗</span>';
+            }
+            
+            this.showNotification(
+                `Letter correction saved: "${letterData.romanized}" -> "${correctLabel}"`,
+                'success'
+            );
+            
+            // Clear pending
+            this._pendingLetterCorrection = null;
+            this.hideCorrectionModal();
+            return;
+        }
+        
         // Check if this is a history correction
         if (this._pendingHistoryCorrection) {
             const historyData = this._pendingHistoryCorrection;
@@ -1247,6 +1306,144 @@ class PSLRecognitionApp {
                 <span class="english">No signs yet</span>
             </div>
         `;
+    }
+    
+    // ================== LETTER HISTORY ==================
+    
+    /**
+     * Add a letter to the letter history with feedback buttons
+     */
+    addLetterToHistory(letterData) {
+        if (!this.elements.letterHistoryList) return;
+        
+        // Remove empty message if present
+        const emptyMessage = this.elements.letterHistoryList.querySelector('.letter-history-empty');
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+        
+        // Generate unique ID for this letter
+        const letterId = `letter-${++this.letterIdCounter}`;
+        
+        // Store letter data
+        const letterRecord = {
+            id: letterId,
+            urduChar: letterData.urduChar,
+            romanized: letterData.romanized,
+            confidence: letterData.confidence,
+            timestamp: Date.now(),
+            landmarks: this.currentLandmarkSequence ? [...this.currentLandmarkSequence] : null,
+            feedbackGiven: false
+        };
+        this.letterHistory.push(letterRecord);
+        
+        // Keep only last 30 letters in memory
+        if (this.letterHistory.length > 30) {
+            const oldest = this.letterHistory.shift();
+            const oldElement = document.getElementById(oldest.id);
+            if (oldElement) oldElement.remove();
+        }
+        
+        // Create letter history item element
+        const letterItem = document.createElement('div');
+        letterItem.className = 'letter-history-item';
+        letterItem.id = letterId;
+        letterItem.dataset.romanized = letterData.romanized;
+        
+        const confidencePercent = Math.round(letterData.confidence * 100);
+        
+        letterItem.innerHTML = `
+            <span class="letter-char">${letterData.urduChar}</span>
+            <span class="letter-label">${letterData.romanized}</span>
+            <span class="letter-confidence">${confidencePercent}%</span>
+            <div class="letter-feedback-btns">
+                <button class="letter-fb-btn letter-fb-correct" title="Correct" data-id="${letterId}">✓</button>
+                <button class="letter-fb-btn letter-fb-incorrect" title="Incorrect" data-id="${letterId}">✗</button>
+            </div>
+        `;
+        
+        // Add click handlers for feedback buttons
+        const correctBtn = letterItem.querySelector('.letter-fb-correct');
+        const incorrectBtn = letterItem.querySelector('.letter-fb-incorrect');
+        
+        correctBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleLetterFeedback(letterId, true);
+        });
+        
+        incorrectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.handleLetterFeedback(letterId, false);
+        });
+        
+        // Add to the list (at the end for RTL display order)
+        this.elements.letterHistoryList.appendChild(letterItem);
+        
+        // Scroll to show the newest letter
+        this.elements.letterHistoryList.scrollLeft = this.elements.letterHistoryList.scrollWidth;
+        
+        console.log(`[LetterHistory] Added: ${letterData.romanized} -> ${letterData.urduChar}`);
+    }
+    
+    /**
+     * Handle feedback for a specific letter in history
+     */
+    handleLetterFeedback(letterId, isCorrect) {
+        // Find the letter data
+        const letterData = this.letterHistory.find(l => l.id === letterId);
+        if (!letterData) {
+            this.showNotification('Letter not found', 'warning');
+            return;
+        }
+        
+        if (letterData.feedbackGiven) {
+            this.showNotification('Feedback already given for this letter', 'info');
+            return;
+        }
+        
+        const letterElement = document.getElementById(letterId);
+        
+        if (isCorrect) {
+            // Record correct feedback
+            this.feedbackManager.recordCorrect(
+                letterData.romanized,
+                letterData.confidence,
+                letterData.landmarks
+            );
+            
+            // Mark as done in UI
+            letterData.feedbackGiven = true;
+            if (letterElement) {
+                letterElement.classList.add('feedback-given', 'feedback-correct');
+                const btns = letterElement.querySelector('.letter-feedback-btns');
+                if (btns) btns.innerHTML = '<span class="letter-fb-done correct">✓</span>';
+            }
+            
+            this.showNotification(`"${letterData.urduChar}" marked correct`, 'success');
+            
+        } else {
+            // Show correction modal for this letter
+            this._pendingLetterCorrection = letterData;
+            this.showCorrectionModal(letterData.romanized, letterData.confidence);
+        }
+    }
+    
+    /**
+     * Clear all letter history
+     */
+    clearLetterHistory() {
+        this.letterHistory = [];
+        this.letterIdCounter = 0;
+        
+        if (this.elements.letterHistoryList) {
+            this.elements.letterHistoryList.innerHTML = `
+                <div class="letter-history-empty">
+                    <span class="english">Letters will appear here</span>
+                </div>
+            `;
+        }
+        
+        this.showNotification('Letter history cleared', 'info');
     }
     
     // ================== STATUS UPDATES ==================

@@ -566,6 +566,224 @@
         }
         
         /* ==========================================
+           LETTER HISTORY WITH FEEDBACK
+           ========================================== */
+        
+        .letter-history-section {
+            margin-top: 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, rgba(90, 154, 138, 0.05), rgba(120, 180, 160, 0.08));
+            border-radius: 12px;
+            border: 1px solid rgba(90, 154, 138, 0.15);
+        }
+        
+        .letter-history-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(90, 154, 138, 0.12);
+        }
+        
+        .letter-history-header .urdu-small {
+            font-family: 'Noto Sans Arabic', serif;
+            font-size: 0.85rem;
+            color: var(--zen-accent);
+            font-weight: 500;
+        }
+        
+        .letter-history-header .english-small {
+            font-size: 0.75rem;
+            color: var(--zen-text-muted);
+            flex: 1;
+        }
+        
+        .clear-letters-btn {
+            background: transparent;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: all 0.2s ease;
+            padding: 4px;
+        }
+        
+        .clear-letters-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        
+        .letter-history-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-height: 140px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        
+        .letter-history-empty {
+            width: 100%;
+            text-align: center;
+            padding: 16px;
+            color: var(--zen-text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+        
+        .letter-history-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(90, 154, 138, 0.15);
+            border-radius: 10px;
+            min-width: 60px;
+            transition: all 0.25s ease;
+            animation: letterSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes letterSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .letter-history-item:hover {
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 4px 12px rgba(90, 154, 138, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .letter-char {
+            font-family: 'Noto Sans Arabic', 'Amiri', serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--zen-accent);
+            line-height: 1.2;
+        }
+        
+        .letter-label {
+            font-size: 0.65rem;
+            color: var(--zen-text-muted);
+            margin-top: 2px;
+            text-transform: capitalize;
+        }
+        
+        .letter-confidence {
+            font-size: 0.6rem;
+            color: var(--zen-accent);
+            opacity: 0.7;
+            margin-top: 1px;
+        }
+        
+        .letter-feedback-btns {
+            display: flex;
+            gap: 4px;
+            margin-top: 6px;
+        }
+        
+        .letter-fb-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .letter-fb-correct {
+            background: rgba(104, 168, 149, 0.15);
+            color: var(--zen-success);
+        }
+        
+        .letter-fb-correct:hover {
+            background: var(--zen-success);
+            color: white;
+            transform: scale(1.15);
+            box-shadow: 0 3px 10px rgba(104, 168, 149, 0.35);
+        }
+        
+        .letter-fb-incorrect {
+            background: rgba(201, 120, 120, 0.15);
+            color: var(--zen-error);
+        }
+        
+        .letter-fb-incorrect:hover {
+            background: var(--zen-error);
+            color: white;
+            transform: scale(1.15);
+            box-shadow: 0 3px 10px rgba(201, 120, 120, 0.35);
+        }
+        
+        .letter-fb-done {
+            font-size: 14px;
+            padding: 2px 6px;
+        }
+        
+        .letter-fb-done.correct {
+            color: var(--zen-success);
+        }
+        
+        .letter-fb-done.incorrect {
+            color: var(--zen-error);
+        }
+        
+        .letter-history-item.feedback-given {
+            opacity: 0.75;
+        }
+        
+        .letter-history-item.feedback-correct {
+            border-color: var(--zen-success);
+            background: rgba(104, 168, 149, 0.1);
+        }
+        
+        .letter-history-item.feedback-incorrect {
+            border-color: var(--zen-error);
+            background: rgba(201, 120, 120, 0.1);
+        }
+        
+        /* Mobile adjustments for letter history */
+        @media (max-width: 768px) {
+            .letter-history-section {
+                padding: 10px;
+            }
+            
+            .letter-history-list {
+                max-height: 100px;
+                gap: 6px;
+            }
+            
+            .letter-history-item {
+                padding: 6px 8px;
+                min-width: 50px;
+            }
+            
+            .letter-char {
+                font-size: 1.2rem;
+            }
+            
+            .letter-fb-btn {
+                width: 28px;
+                height: 28px;
+                font-size: 13px;
+            }
+        }
+        
+        /* ==========================================
            ZEN CORRECTION MODAL
            ========================================== */
         
@@ -1404,6 +1622,20 @@
                                     <span class="urdu-small">لفظ مٹائیں</span>
                                     <span class="english-small">Undo Word</span>
                                 </button>
+                            </div>
+                            
+                            <!-- Letter History with Feedback -->
+                            <div class="letter-history-section">
+                                <div class="letter-history-header">
+                                    <span class="urdu-small">حروف کی تاریخ:</span>
+                                    <span class="english-small">Letter History</span>
+                                    <button class="clear-letters-btn" id="clearLettersBtn" title="Clear letter history">🗑️</button>
+                                </div>
+                                <div class="letter-history-list" id="letterHistoryList">
+                                    <div class="letter-history-empty">
+                                        <span class="english">Letters will appear here</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
