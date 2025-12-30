@@ -10,10 +10,10 @@
 
 class WordFormation {
     constructor(options = {}) {
-        // Configuration
+        // Configuration - OPTIMIZED for faster response
         this.config = {
-            pauseThresholdMs: options.pauseThresholdMs || 5000,  // 5 seconds for word completion
-            minLetterGapMs: options.minLetterGapMs || 1500,       // 1.5 seconds min gap for same letter
+            pauseThresholdMs: options.pauseThresholdMs || 4000,  // FASTER: 4s instead of 5s for word completion
+            minLetterGapMs: options.minLetterGapMs || 1200,       // FASTER: 1.2s instead of 1.5s for same letter
             maxWordsInSentence: options.maxWordsInSentence || 20,
             showPauseIndicator: options.showPauseIndicator !== false
         };
@@ -83,6 +83,12 @@ class WordFormation {
     processPrediction(prediction) {
         if (!this.isReady) {
             console.warn('[WordFormation] Not ready yet');
+            return;
+        }
+        
+        // Defensive check: ensure prediction object is valid
+        if (!prediction || typeof prediction.label !== 'string') {
+            console.warn('[WordFormation] Invalid prediction object:', prediction);
             return;
         }
         

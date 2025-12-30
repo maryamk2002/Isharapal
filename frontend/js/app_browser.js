@@ -16,15 +16,27 @@ class PSLRecognitionApp {
         this.isInitialized = false;
         this.isRecognitionActive = false;
         this.currentLanguage = 'urdu';
+        
+        // ==========================================
+        // OPTIMIZED Settings for Speed
+        // ==========================================
         this.settings = {
             sensitivity: 0.5,
-            frameRate: 15,
+            frameRate: 18,  // INCREASED from 15 to 18 FPS for faster response
             language: 'urdu'
         };
         this.frameIntervalMs = 1000 / this.settings.frameRate;
         this.lastFrameSentAt = 0;
         this.lastDisplayedPrediction = null;
         this.lastDisplayedConfidence = 0;
+        
+        // NEW: Performance tracking
+        this.performanceMetrics = {
+            avgFrameTime: 0,
+            avgPredictionTime: 0,
+            droppedFrames: 0,
+            qualityIssues: 0
+        };
         
         // Components
         this.camera = null;
@@ -78,13 +90,24 @@ class PSLRecognitionApp {
             }
             
             // Initialize ONNX predictor (replaces WebSocket)
+            // OPTIMIZED: Faster settings for better responsiveness
             this.updateLoadingMessage('Loading AI model (~11MB)...');
             this.predictor = new ONNXPredictor({
-                slidingWindowSize: 45,
-                minPredictionFrames: 32,
-                stabilityVotes: 5,
-                stabilityThreshold: 3,
-                minConfidence: 0.55
+                // SPEED: Smaller buffer, faster predictions
+                slidingWindowSize: 36,       // Was 45, faster buffer fill
+                minPredictionFrames: 12,     // Was 32, predict after ~0.8s
+                
+                // SPEED: Faster stability (2/3 majority)
+                stabilityVotes: 3,           // Was 5
+                stabilityThreshold: 2,       // Was 3
+                
+                // ACCURACY: Balanced confidence
+                minConfidence: 0.58,         // Was 0.55, slightly stricter
+                lowConfidenceThreshold: 0.42,
+                
+                // ROBUSTNESS: Quality thresholds
+                minHandVisibility: 0.6,
+                maxJitterThreshold: 0.15
             });
             
             // Set up predictor callbacks
@@ -99,6 +122,19 @@ class PSLRecognitionApp {
             this.predictor.onError = (error) => {
                 console.error('Predictor error:', error);
                 this.showNotification(error.message, 'error');
+            };
+            
+            // NEW: Quality issue handler - helps user know when hand detection is poor
+            this.predictor.onQualityIssue = (quality) => {
+                this.performanceMetrics.qualityIssues++;
+                // Only show warning occasionally to avoid spam
+                if (this.performanceMetrics.qualityIssues % 30 === 1) {
+                    if (quality.reason === 'low_visibility') {
+                        console.log('[Quality] Low hand visibility - ensure hand is fully in frame');
+                    } else if (quality.reason === 'high_jitter') {
+                        console.log('[Quality] Hand movement too fast - try slower gestures');
+                    }
+                }
             };
             
             const predictorReady = await this.predictor.init(
@@ -121,11 +157,11 @@ class PSLRecognitionApp {
                 this.showNotification(hint.hint, 'info');
             };
             
-            // Initialize word formation module
+            // Initialize word formation module - OPTIMIZED for faster response
             this.updateLoadingMessage('Setting up word formation...');
             this.wordFormation = new WordFormation({
-                pauseThresholdMs: 5000,  // 5 seconds for word completion
-                minLetterGapMs: 1500,    // 1.5 seconds min gap for same letter
+                pauseThresholdMs: 4000,  // FASTER: 4s instead of 5s for word completion
+                minLetterGapMs: 1200,    // FASTER: 1.2s instead of 1.5s for same letter
                 showPauseIndicator: true
             });
             
@@ -166,8 +202,21 @@ class PSLRecognitionApp {
             this.isInitialized = true;
             console.log('[OK] PSL Recognition System initialized (Browser-Only Mode)');
             
-            // Show welcome notification
-            this.showNotification('System ready! No server needed - runs entirely in your browser.', 'success');
+            // Show welcome notification with backend info
+            const modelInfo = this.predictor.getModelInfo();
+            const backendMsg = modelInfo.backendUsed === 'webgpu' 
+                ? 'GPU accelerated! 🚀' 
+                : 'Running on CPU';
+            this.showNotification(`System ready! ${backendMsg} - All processing happens locally.`, 'success');
+            
+            // Log performance configuration
+            console.log('[PERF] Configuration:', {
+                backend: modelInfo.backendUsed,
+                frameRate: this.settings.frameRate,
+                slidingWindow: modelInfo.config.slidingWindowSize,
+                minFrames: modelInfo.config.minPredictionFrames,
+                stability: `${modelInfo.config.stabilityThreshold}/${modelInfo.config.stabilityVotes}`
+            });
             
         } catch (error) {
             console.error('Initialization failed:', error);
@@ -526,6 +575,11 @@ class PSLRecognitionApp {
             return;
         }
         
+        // Defensive check: ensure predictor is available
+        if (!this.predictor || !this.predictor.isReady) {
+            return;
+        }
+        
         try {
             this.lastFrameSentAt = now;
             
@@ -556,12 +610,13 @@ class PSLRecognitionApp {
     }
     
     /**
-     * Start the prediction loop (runs at ~10Hz)
+     * Start the prediction loop (runs at ~12Hz for faster response)
      */
     startPredictionLoop() {
         this.stopPredictionLoop();  // Clear any existing
         
-        const predictionInterval = 100;  // 10 predictions per second
+        // OPTIMIZED: Faster prediction rate (12Hz instead of 10Hz)
+        const predictionInterval = 83;  // ~12 predictions per second (was 100ms)
         
         this.predictionLoopInterval = setInterval(async () => {
             if (!this.isRecognitionActive) {
@@ -569,7 +624,14 @@ class PSLRecognitionApp {
             }
             
             try {
+                const startTime = performance.now();
                 const result = await this.predictor.predict(true);
+                const predTime = performance.now() - startTime;
+                
+                // Track prediction performance
+                this.performanceMetrics.avgPredictionTime = 
+                    this.performanceMetrics.avgPredictionTime * 0.9 + predTime * 0.1;
+                
                 this.handlePredictionResult(result);
                 
             } catch (error) {
@@ -578,7 +640,7 @@ class PSLRecognitionApp {
             
         }, predictionInterval);
         
-        console.log('Prediction loop started');
+        console.log('Prediction loop started at 12Hz');
     }
     
     /**
@@ -593,6 +655,7 @@ class PSLRecognitionApp {
     
     /**
      * Handle prediction result from ONNX predictor
+     * OPTIMIZED: Better status handling and confidence display
      */
     handlePredictionResult(result) {
         // Update buffer status
@@ -600,28 +663,37 @@ class PSLRecognitionApp {
             this.updateBufferStatus(result.bufferSize, this.predictor.config.slidingWindowSize);
         }
         
-        // Update system status based on result
+        // IMPROVED: More informative status messages
         if (result.status === 'collecting_frames') {
-            this.updateSystemStatus('Collecting...');
+            const progress = Math.round((result.bufferSize / result.minRequired) * 100);
+            this.updateSystemStatus(`Collecting... ${progress}%`);
         } else if (result.status === 'low_confidence') {
             this.updateSystemStatus('Searching...');
             if (this.ui) {
                 this.ui.updatePrediction(null, result.confidence || 0, [], false, true);
             }
+            // Track low confidence predictions
+            this.performanceMetrics.droppedFrames++;
         } else if (result.status === 'collecting_stability') {
+            // NEW: Show top prediction while stabilizing (gives user feedback)
             this.updateSystemStatus('Stabilizing...');
-            // Show current prediction but not stable
             if (result.prediction && this.ui) {
+                // Show prediction with lower opacity or different style to indicate it's not final
                 this.ui.updatePrediction(result.prediction, result.confidence, result.allPredictions || [], false, false);
             }
         } else if (result.status === 'success' && result.isStable) {
             this.updateSystemStatus('Active');
+        } else if (result.status === 'error') {
+            this.updateSystemStatus('Error');
+            console.error('Prediction error:', result.error);
         }
         
-        // Update FPS
+        // Update FPS (use prediction time for more accurate reading)
         if (result.predictionTimeMs) {
-            const fps = 1000 / result.predictionTimeMs;
-            this.updateFPS(Math.min(fps, 60));
+            const inferenceRate = 1000 / result.predictionTimeMs;
+            // Blend with actual camera FPS for display
+            const displayFps = Math.min(inferenceRate, this.settings.frameRate);
+            this.updateFPS(Math.round(displayFps));
         }
     }
     

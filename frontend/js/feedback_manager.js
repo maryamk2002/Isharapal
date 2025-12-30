@@ -287,7 +287,17 @@ class FeedbackManager {
             let data = [];
             const stored = localStorage.getItem(key);
             if (stored) {
-                data = JSON.parse(stored);
+                try {
+                    data = JSON.parse(stored);
+                    // Ensure data is an array (defensive check)
+                    if (!Array.isArray(data)) {
+                        console.warn('[FeedbackManager] Stored data was not an array, resetting');
+                        data = [];
+                    }
+                } catch (parseError) {
+                    console.warn('[FeedbackManager] Failed to parse stored data, resetting:', parseError);
+                    data = [];
+                }
             }
             
             data.push(item);

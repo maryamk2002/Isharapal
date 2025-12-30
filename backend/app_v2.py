@@ -92,6 +92,9 @@ feedback_db = None  # Feedback database
 # Session management (simplified)
 sessions: Dict[str, Dict[str, Any]] = {}
 
+# Global performance monitor (initialized in initialize_system)
+global_performance_monitor = None
+
 # Performance monitoring
 performance_stats = {
     'total_connections': 0,
@@ -518,6 +521,12 @@ def handle_feedback(data):
             emit('error', {'message': 'Invalid feedback data'})
             return
         
+        # Validate label is a known sign (security: prevent arbitrary strings)
+        if predictor and hasattr(predictor, 'labels') and label not in predictor.labels:
+            logger.warning(f"Feedback received for unknown label: {label}")
+            emit('error', {'message': f'Unknown sign label: {label}'})
+            return
+        
         # Get confidence from metadata
         confidence = metadata.get('confidence', 0.0)
         
@@ -684,10 +693,12 @@ def handle_frame_data(data):
             # hand briefly goes out of frame.
             if no_hands_count >= 22:
                 # Clear buffer after 1.5 seconds of no hands
-                try:
-                    session_predictor.add_frame(None)
-                except Exception as e:
-                    logger.error(f"Error clearing predictor buffer: {e}")
+                # Defensive check: session_predictor might be None if session was cleaned up
+                if session_predictor is not None:
+                    try:
+                        session_predictor.add_frame(None)
+                    except Exception as e:
+                        logger.error(f"Error clearing predictor buffer: {e}")
                     
                 sessions[session_id]['last_landmarks'] = None
                 sessions[session_id]['repeated_landmarks_count'] = 0
