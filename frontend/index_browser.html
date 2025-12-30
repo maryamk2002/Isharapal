@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ISHARAPAL - Browser Mode | Pakistan Sign Language Recognition</title>
     
     <!-- Favicon -->
@@ -273,6 +273,333 @@
         }
         .word-action-btn:active {
             transform: scale(0.98);
+        }
+        
+        /* ==========================================
+           MOBILE RESPONSIVE STYLES
+           ========================================== */
+        
+        /* Tablet and below */
+        @media (max-width: 1024px) {
+            .workspace-grid {
+                grid-template-columns: 1fr !important;
+                gap: 16px;
+            }
+            
+            .video-column, .results-column {
+                max-width: 100%;
+            }
+        }
+        
+        /* Mobile devices */
+        @media (max-width: 768px) {
+            /* Header adjustments */
+            .browser-mode-banner {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+            
+            .header {
+                padding: 0.75rem 0;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 0.75rem;
+                text-align: center;
+            }
+            
+            .logo-section {
+                justify-content: center;
+            }
+            
+            .logo-icon {
+                font-size: 2rem;
+            }
+            
+            .title-main {
+                font-size: 1.25rem;
+            }
+            
+            .title-sub {
+                font-size: 0.8rem;
+            }
+            
+            /* Main content */
+            .main-content {
+                padding: 12px 0;
+            }
+            
+            .container {
+                padding: 0 12px;
+            }
+            
+            /* Video section */
+            .video-card {
+                border-radius: 12px;
+            }
+            
+            .video-container {
+                border-radius: 8px;
+            }
+            
+            .video-wrapper {
+                aspect-ratio: 4/3;
+            }
+            
+            /* Control buttons - stacked and larger for touch */
+            .control-panel {
+                flex-direction: column;
+                gap: 10px;
+                padding: 12px;
+            }
+            
+            .btn {
+                width: 100%;
+                min-height: 48px;
+                font-size: 1rem;
+                border-radius: 10px;
+            }
+            
+            .btn-icon {
+                font-size: 1.2rem;
+            }
+            
+            /* Stats bar - horizontal scroll on small screens */
+            .stats-bar {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                gap: 8px;
+                padding: 8px;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .stat-item {
+                flex-shrink: 0;
+                padding: 6px 12px;
+                font-size: 0.8rem;
+            }
+            
+            /* Prediction card */
+            .prediction-card {
+                border-radius: 12px;
+                margin-bottom: 12px;
+            }
+            
+            .prediction-display {
+                min-height: 100px;
+            }
+            
+            .sign-text {
+                font-size: 2.5rem !important;
+            }
+            
+            /* Feedback buttons - larger for touch */
+            .feedback-buttons {
+                flex-direction: row;
+                gap: 10px;
+            }
+            
+            .feedback-btn {
+                min-height: 50px;
+                font-size: 0.95rem;
+                border-radius: 10px;
+            }
+            
+            /* Sentence card */
+            .sentence-card {
+                padding: 12px;
+                margin-bottom: 12px;
+            }
+            
+            .sentence-display {
+                min-height: 50px;
+                padding: 10px 12px;
+                font-size: 1.3rem;
+            }
+            
+            .current-word-section {
+                padding: 6px 10px;
+            }
+            
+            .current-word {
+                font-size: 1.1rem;
+            }
+            
+            .word-actions {
+                flex-wrap: wrap;
+            }
+            
+            .word-action-btn {
+                flex: 1 1 45%;
+                min-height: 44px;
+                padding: 8px;
+            }
+            
+            /* History card */
+            .history-card {
+                border-radius: 12px;
+            }
+            
+            .history-content-compact {
+                max-height: 200px;
+            }
+            
+            .history-item {
+                padding: 10px 12px;
+            }
+            
+            .history-fb-btn {
+                width: 32px;
+                height: 32px;
+                font-size: 14px;
+            }
+            
+            /* Footer */
+            .footer {
+                padding: 12px 0;
+            }
+            
+            .footer-text {
+                flex-direction: column;
+                gap: 4px;
+                font-size: 0.75rem;
+            }
+            
+            .footer-text .divider {
+                display: none;
+            }
+        }
+        
+        /* Small phones */
+        @media (max-width: 480px) {
+            .browser-mode-banner {
+                font-size: 0.7rem;
+                padding: 5px 8px;
+            }
+            
+            .browser-mode-banner .icon {
+                display: none;
+            }
+            
+            .logo-icon {
+                font-size: 1.75rem;
+            }
+            
+            .title-main {
+                font-size: 1.1rem;
+            }
+            
+            .card-title-simple {
+                font-size: 0.9rem;
+            }
+            
+            .sign-text {
+                font-size: 2rem !important;
+            }
+            
+            .sentence-display {
+                font-size: 1.1rem;
+            }
+            
+            .word-action-btn {
+                flex: 1 1 100%;
+            }
+            
+            /* Correction modal */
+            .correction-modal-content {
+                width: 95%;
+                max-height: 90vh;
+            }
+            
+            .sign-list {
+                max-height: 40vh;
+            }
+            
+            .sign-list-item {
+                padding: 12px;
+                font-size: 1rem;
+            }
+        }
+        
+        /* Landscape mode on mobile */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .workspace-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            
+            .video-wrapper {
+                aspect-ratio: 16/9;
+            }
+            
+            .control-panel {
+                flex-direction: row;
+            }
+            
+            .btn {
+                width: auto;
+                flex: 1;
+            }
+        }
+        
+        /* Touch-friendly improvements */
+        @media (hover: none) and (pointer: coarse) {
+            /* Larger touch targets */
+            .btn, .feedback-btn, .word-action-btn, .sentence-btn {
+                min-height: 48px;
+            }
+            
+            .history-fb-btn {
+                width: 36px;
+                height: 36px;
+            }
+            
+            /* Remove hover effects that don't work on touch */
+            .btn:hover, .feedback-btn:hover, .word-action-btn:hover {
+                transform: none;
+            }
+            
+            /* Active states for touch feedback */
+            .btn:active {
+                transform: scale(0.97);
+                opacity: 0.9;
+            }
+            
+            .feedback-btn:active {
+                transform: scale(0.97);
+            }
+            
+            .word-action-btn:active {
+                transform: scale(0.95);
+                background: rgba(255,255,255,0.2);
+            }
+        }
+        
+        /* Safe area for notched phones (iPhone X+) */
+        @supports (padding: max(0px)) {
+            .header {
+                padding-top: max(0.75rem, env(safe-area-inset-top));
+            }
+            
+            .footer {
+                padding-bottom: max(12px, env(safe-area-inset-bottom));
+            }
+            
+            .container {
+                padding-left: max(12px, env(safe-area-inset-left));
+                padding-right: max(12px, env(safe-area-inset-right));
+            }
+        }
+        
+        /* PWA standalone mode */
+        @media (display-mode: standalone) {
+            .browser-mode-banner {
+                display: none;
+            }
+            
+            .header {
+                padding-top: max(1rem, env(safe-area-inset-top));
+            }
         }
     </style>
 </head>
