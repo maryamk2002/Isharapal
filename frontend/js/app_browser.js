@@ -279,6 +279,10 @@ class PSLRecognitionApp {
         // Letter history tracking
         this.letterHistory = [];
         this.letterIdCounter = 0;
+        
+        // Debug: Log if letter history elements are found
+        console.log('[DOM] letterHistoryList found:', !!this.elements.letterHistoryList);
+        console.log('[DOM] clearLettersBtn found:', !!this.elements.clearLettersBtn);
     }
     
     setupEventListeners() {
@@ -1314,7 +1318,18 @@ class PSLRecognitionApp {
      * Add a letter to the letter history with feedback buttons
      */
     addLetterToHistory(letterData) {
-        if (!this.elements.letterHistoryList) return;
+        console.log('[LetterHistory] addLetterToHistory called:', letterData);
+        
+        if (!this.elements.letterHistoryList) {
+            console.error('[LetterHistory] letterHistoryList element NOT found! Trying to find it now...');
+            // Try to find it again (in case DOM wasn't ready earlier)
+            this.elements.letterHistoryList = document.getElementById('letterHistoryList');
+            if (!this.elements.letterHistoryList) {
+                console.error('[LetterHistory] Still not found. Check HTML for id="letterHistoryList"');
+                return;
+            }
+            console.log('[LetterHistory] Found it on retry!');
+        }
         
         // Remove empty message if present
         const emptyMessage = this.elements.letterHistoryList.querySelector('.letter-history-empty');
