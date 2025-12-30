@@ -10,7 +10,7 @@ class CameraManager {
         this.ctx = null;
         this.stream = null;
         this.isActive = false;
-        this.frameRate = 15;  // Increased to 15 FPS for continuous prediction
+        this.frameRate = 18;  // OPTIMIZED: Increased from 15 to 18 FPS for faster response
         this.frameInterval = null;
         this.lastFrameTime = 0;
         this.frameCanvas = null;

@@ -21,16 +21,31 @@ class ONNXPredictor {
         this.modelInfo = null;
         this.isReady = false;
         
-        // Configuration (match Python predictor_v2.py)
+        // ==========================================
+        // OPTIMIZED Configuration for Speed + Accuracy
+        // ==========================================
         this.config = {
-            slidingWindowSize: options.slidingWindowSize || 45,  // Frames to buffer
-            modelSequenceLength: 60,  // Model expects 60 frames
-            minPredictionFrames: options.minPredictionFrames || 32,  // Min frames before predicting
-            stabilityVotes: options.stabilityVotes || 5,  // Recent predictions to consider
-            stabilityThreshold: options.stabilityThreshold || 3,  // Votes needed for stable
-            minConfidence: options.minConfidence || 0.55,  // Default confidence threshold
-            lowConfidenceThreshold: options.lowConfidenceThreshold || 0.45,  // "Searching" state
-            emaAlpha: options.emaAlpha || 0.7,  // EMA smoothing (0.7 = 70% new, 30% old)
+            // SPEED: Reduced buffer for faster response (~0.8s instead of ~1.5s)
+            slidingWindowSize: options.slidingWindowSize || 36,  // Was 45, now 36 (~2.4s at 15FPS)
+            modelSequenceLength: 60,  // Model expects 60 frames (padded if needed)
+            
+            // SPEED: Start predicting earlier
+            minPredictionFrames: options.minPredictionFrames || 12,  // Was 32, now 12 (~0.8s)
+            
+            // SPEED: Faster stability (2/3 majority instead of 3/5)
+            stabilityVotes: options.stabilityVotes || 3,  // Was 5, now 3
+            stabilityThreshold: options.stabilityThreshold || 2,  // Was 3, now 2
+            
+            // ACCURACY: Slightly higher thresholds to reduce false positives
+            minConfidence: options.minConfidence || 0.58,  // Was 0.55, now 0.58
+            lowConfidenceThreshold: options.lowConfidenceThreshold || 0.42,  // Was 0.45, now 0.42
+            
+            // ROBUSTNESS: More responsive EMA
+            emaAlpha: options.emaAlpha || 0.75,  // Was 0.7, now 0.75 (more responsive)
+            
+            // NEW: Hand quality thresholds
+            minHandVisibility: options.minHandVisibility || 0.6,  // Minimum 60% landmarks visible
+            maxJitterThreshold: options.maxJitterThreshold || 0.15,  // Max frame-to-frame jitter
         };
         
         // Sliding window buffer
@@ -54,14 +69,20 @@ class ONNXPredictor {
             successfulPredictions: 0,
             avgPredictionTime: 0,
             avgConfidence: 0,
-            bufferResets: 0
+            bufferResets: 0,
+            rejectedLowQuality: 0,  // NEW: Track rejected frames
+            rejectedLowConfidence: 0  // NEW: Track rejected predictions
         };
+        
+        // NEW: Previous frame for jitter detection
+        this.previousLandmarks = null;
         
         // Event callbacks
         this.onPrediction = null;
         this.onReady = null;
         this.onError = null;
         this.onLoadProgress = null;
+        this.onQualityIssue = null;  // NEW: Callback for quality issues
     }
     
     /**
@@ -110,17 +131,42 @@ class ONNXPredictor {
             this._emitProgress('Loading ONNX model (~11MB)...', 30);
             console.log('[ONNXPredictor] Loading ONNX model...');
             
-            // Configure ONNX Runtime
+            // ==========================================
+            // OPTIMIZED: Try WebGPU first, fallback to WASM
+            // ==========================================
+            let executionProviders = ['wasm'];
+            let backendUsed = 'wasm';
+            
+            // Check for WebGPU support (significantly faster)
+            if (typeof navigator !== 'undefined' && navigator.gpu) {
+                try {
+                    const adapter = await navigator.gpu.requestAdapter();
+                    if (adapter) {
+                        console.log('[ONNXPredictor] WebGPU available! Using GPU acceleration.');
+                        executionProviders = ['webgpu', 'wasm'];  // WebGPU with WASM fallback
+                        backendUsed = 'webgpu';
+                        this._emitProgress('Using GPU acceleration...', 35);
+                    }
+                } catch (e) {
+                    console.log('[ONNXPredictor] WebGPU check failed, using WASM:', e.message);
+                }
+            }
+            
+            // Configure ONNX Runtime with optimizations
             const sessionOptions = {
-                executionProviders: ['wasm'],  // Use WebAssembly backend
+                executionProviders: executionProviders,
                 graphOptimizationLevel: 'all',
                 enableCpuMemArena: true,
-                enableMemPattern: true
+                enableMemPattern: true,
+                // NEW: Additional optimizations
+                executionMode: 'sequential',  // Better for single predictions
+                logSeverityLevel: 3,  // Warnings only
             };
             
             // Create inference session
             this.session = await ort.InferenceSession.create(modelPath, sessionOptions);
-            console.log('[ONNXPredictor] ONNX model loaded successfully');
+            this.backendUsed = backendUsed;
+            console.log(`[ONNXPredictor] ONNX model loaded successfully (backend: ${backendUsed})`);
             
             // Log model input/output info
             const inputNames = this.session.inputNames;
@@ -151,25 +197,104 @@ class ONNXPredictor {
     }
     
     /**
-     * Add a frame to the sliding window buffer.
+     * Add a frame to the sliding window buffer with quality validation.
      * @param {Float32Array|Array} landmarks - 189-element landmark array
+     * @returns {Object} Status of frame addition
      */
     addFrame(landmarks) {
         if (!landmarks || landmarks.length === 0) {
             // No landmarks (no hands) - optionally clear buffer
-            return;
+            return { added: false, reason: 'no_landmarks' };
         }
         
         // Ensure landmarks is a regular array
         const frame = Array.isArray(landmarks) ? landmarks : Array.from(landmarks);
         
+        // NEW: Quality validation
+        const quality = this._validateFrameQuality(frame);
+        if (!quality.valid) {
+            this.stats.rejectedLowQuality++;
+            if (this.onQualityIssue) {
+                this.onQualityIssue(quality);
+            }
+            // Still add frame but flag it (don't reject completely to maintain flow)
+            // Only skip if quality is very poor
+            if (quality.visibility < 0.3) {
+                return { added: false, reason: 'very_low_quality', quality };
+            }
+        }
+        
         // Add to buffer
         this.frameBuffer.push(frame);
+        
+        // Store for next frame jitter check
+        this.previousLandmarks = frame;
         
         // Keep buffer at sliding window size
         while (this.frameBuffer.length > this.config.slidingWindowSize) {
             this.frameBuffer.shift();
         }
+        
+        return { added: true, quality };
+    }
+    
+    /**
+     * NEW: Validate frame quality before adding to buffer.
+     * Checks visibility (non-zero landmarks) and jitter.
+     * @param {Array} frame - 189-element landmark array
+     * @returns {Object} Quality assessment
+     */
+    _validateFrameQuality(frame) {
+        // Check visibility: count non-zero landmarks (first 126 are actual hand data)
+        const handLandmarks = frame.slice(0, 126);
+        let nonZeroCount = 0;
+        for (let i = 0; i < handLandmarks.length; i++) {
+            if (Math.abs(handLandmarks[i]) > 0.001) {
+                nonZeroCount++;
+            }
+        }
+        const visibility = nonZeroCount / 126;
+        
+        // Check jitter: compare with previous frame
+        let jitter = 0;
+        if (this.previousLandmarks) {
+            let totalDiff = 0;
+            let validPairs = 0;
+            for (let i = 0; i < 126; i += 3) {
+                // Only check x,y coordinates (skip z)
+                const dx = Math.abs(frame[i] - this.previousLandmarks[i]);
+                const dy = Math.abs(frame[i + 1] - this.previousLandmarks[i + 1]);
+                if (frame[i] !== 0 && this.previousLandmarks[i] !== 0) {
+                    totalDiff += dx + dy;
+                    validPairs++;
+                }
+            }
+            jitter = validPairs > 0 ? totalDiff / validPairs : 0;
+        }
+        
+        // Validate ranges: x,y should be 0-1
+        let outOfRange = 0;
+        for (let i = 0; i < 126; i += 3) {
+            if (frame[i] < 0 || frame[i] > 1) outOfRange++;
+            if (frame[i + 1] < 0 || frame[i + 1] > 1) outOfRange++;
+        }
+        const rangeValid = outOfRange < 5;  // Allow a few outliers
+        
+        const valid = visibility >= this.config.minHandVisibility && 
+                      jitter <= this.config.maxJitterThreshold &&
+                      rangeValid;
+        
+        return {
+            valid,
+            visibility,
+            jitter,
+            rangeValid,
+            reason: !valid ? (
+                visibility < this.config.minHandVisibility ? 'low_visibility' :
+                jitter > this.config.maxJitterThreshold ? 'high_jitter' :
+                'out_of_range'
+            ) : null
+        };
     }
     
     /**
@@ -481,6 +606,7 @@ class ONNXPredictor {
         this.lastStableTime = null;
         this.emaProbabilities = null;
         this.lastRawPrediction = null;
+        this.previousLandmarks = null;  // NEW: Clear jitter detection state
         this.stats.bufferResets++;
         console.log('[ONNXPredictor] Buffer cleared');
     }
@@ -529,7 +655,9 @@ class ONNXPredictor {
             numClasses: this.labels.length,
             modelInfo: this.modelInfo,
             config: this.config,
-            isReady: this.isReady
+            isReady: this.isReady,
+            backendUsed: this.backendUsed || 'wasm',
+            stats: this.stats
         };
     }
     
