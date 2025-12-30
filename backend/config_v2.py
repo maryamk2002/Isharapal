@@ -30,6 +30,7 @@ RAW_DATA_DIR = DATA_DIR / "Pakistan Sign Language Urdu Alphabets"
 FEATURES_DIR = DATA_DIR / "features_temporal"
 V2_FEATURES_DIR = DATA_DIR / "features_v2"  # New v2 processed features
 V2_SPLITS_DIR = DATA_DIR / "splits_v2"
+FEEDBACK_LOGS_DIR = DATA_DIR / "feedback_logs"  # User feedback with landmarks for retraining
 
 # ==============================================================================
 # ALL URDU ALPHABET SIGNS (37+ classes)
@@ -156,16 +157,19 @@ class InferenceConfigV2:
     
     # Sliding window
     SLIDING_WINDOW_SIZE: int = 45  # Closer to model's 60-frame training (45 frames ~= 3s at 15 FPS)
-    MIN_FRAMES_FOR_PREDICTION: int = 30  # Start predicting at 30 frames (~2s)
+    MIN_FRAMES_FOR_PREDICTION: int = 15  # Start predicting faster (~1s at 15 FPS) - accuracy preserved via full window
     
-    # Stability (DEMO OPTIMIZED: faster response)
-    STABILITY_VOTES: int = 5
-    STABILITY_THRESHOLD: int = 3  # Need 3/5 votes (60% - balanced)
-    MIN_CONFIDENCE: float = 0.60  # Balanced confidence
+    # Stability (BALANCED: responsive but stable)
+    STABILITY_VOTES: int = 5  # Fewer votes for faster response
+    STABILITY_THRESHOLD: int = 3  # Need 3/5 votes (60%) - faster transitions
+    MIN_CONFIDENCE: float = 0.65  # Slightly lower for better responsiveness
+    
+    # NEW: Low confidence handling
+    LOW_CONFIDENCE_THRESHOLD: float = 0.50  # Below this = "searching" state
     
     # Buffer management
     RESET_ON_NO_HANDS: bool = True
-    NO_HANDS_TIMEOUT_MS: int = 1000
+    NO_HANDS_TIMEOUT_MS: int = 1500  # Wait 1.5s before clearing
     
     # Keypoints
     SEND_KEYPOINTS_TO_FRONTEND: bool = True
@@ -176,17 +180,17 @@ class FilteringConfig:
     """Keypoint filtering and denoising settings."""
     
     # Moving average smoothing
-    MOVING_AVERAGE_WINDOW: int = 5  # Number of frames for smoothing
+    MOVING_AVERAGE_WINDOW: int = 3  # Reduced for less lag (was 5)
     
     # Jitter detection
-    JITTER_THRESHOLD: float = 0.01  # Max movement for "stable" frame (~1% of coords)
+    JITTER_THRESHOLD: float = 0.005  # Tighter threshold for detecting micro-jitter
     
     # Stuck sequence detection (HASH-BASED)
-    STUCK_THRESHOLD_FRAMES: int = 60  # Frames to check for identical data (~4s at 15 FPS)
+    STUCK_THRESHOLD_FRAMES: int = 45  # ~3s at 15 FPS (was 60)
     STUCK_MOVEMENT_THRESHOLD: float = 0.001  # Not used (kept for compatibility)
     
     # Enable/disable filtering
-    ENABLE_FILTERING: bool = False  # DISABLED - causing system to hang
+    ENABLE_FILTERING: bool = True  # ENABLED - smooths jittery landmarks
 
 
 @dataclass
@@ -220,6 +224,22 @@ class MonitoringConfig:
     # Auto-save metrics
     AUTO_SAVE_METRICS: bool = True
     AUTO_SAVE_INTERVAL_SEC: float = 60.0  # Save metrics file every 60 seconds
+
+
+@dataclass
+class SessionConfig:
+    """Session management and inactivity settings."""
+    
+    # Inactivity timeout (in seconds)
+    # System will stop camera if no landmarks detected AND no UI interaction for this duration
+    INACTIVITY_TIMEOUT_SEC: float = 600.0  # 10 minutes = 600 seconds
+    
+    # Inactivity check interval (how often to check for inactivity)
+    INACTIVITY_CHECK_INTERVAL_SEC: float = 30.0  # Check every 30 seconds
+    
+    # Graceful shutdown settings
+    WAIT_FOR_PROCESSING_ON_STOP: bool = True  # Wait for current inference to complete on stop
+    MAX_GRACEFUL_SHUTDOWN_SEC: float = 5.0  # Maximum time to wait for graceful shutdown
 
 
 @dataclass
@@ -264,6 +284,7 @@ def ensure_v2_directories() -> None:
         V2_LOGS_DIR,
         V2_FEATURES_DIR,
         V2_SPLITS_DIR,
+        FEEDBACK_LOGS_DIR,
     ]
     
     for directory in directories:
@@ -359,6 +380,7 @@ dataset_config_v2 = DatasetConfigV2()
 filtering_config = FilteringConfig()
 recording_config = RecordingConfig()
 monitoring_config = MonitoringConfig()
+session_config = SessionConfig()
 
 # Ensure directories exist
 ensure_v2_directories()
@@ -379,6 +401,7 @@ __all__ = [
     "FEATURES_DIR",
     "V2_FEATURES_DIR",
     "V2_SPLITS_DIR",
+    "FEEDBACK_LOGS_DIR",
     
     # Sign lists
     "ALL_URDU_SIGNS",
@@ -393,6 +416,7 @@ __all__ = [
     "FilteringConfig",
     "RecordingConfig",
     "MonitoringConfig",
+    "SessionConfig",
     
     # Config instances
     "model_config_v2",
@@ -402,6 +426,7 @@ __all__ = [
     "filtering_config",
     "recording_config",
     "monitoring_config",
+    "session_config",
     
     # Functions
     "ensure_v2_directories",

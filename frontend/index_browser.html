@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISHARAPAL - Browser Mode | Pakistan Sign Language Recognition</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👋</text></svg>">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#10b981">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ISHARAPAL">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="css/urdu-fonts.css">
+    <link rel="stylesheet" href="css/main_v2.css">
+    
+    <!-- MediaPipe Hands -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    
+    <!-- ONNX Runtime Web (for browser-based inference) -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+    
+    <!-- Firebase SDK (for cloud sync - optional) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    
+    <!-- NOTE: Socket.IO is NOT needed for browser-only mode -->
+    
+    <style>
+        /* Browser mode indicator styles */
+        .connection-badge.browser-mode {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        .connection-badge.browser-mode .badge-text {
+            color: white;
+        }
+        .browser-mode-banner {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            text-align: center;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .browser-mode-banner .icon {
+            font-size: 1.1rem;
+        }
+        
+        /* History item with feedback buttons */
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.2s;
+        }
+        .history-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+        .history-item-info {
+            flex: 1;
+        }
+        .history-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .history-item-confidence {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            min-width: 40px;
+            text-align: right;
+        }
+        .history-feedback-btns {
+            display: flex;
+            gap: 4px;
+        }
+        .history-fb-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .history-fb-correct {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        .history-fb-correct:hover {
+            background: #10b981;
+            color: white;
+            transform: scale(1.1);
+        }
+        .history-fb-incorrect {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        .history-fb-incorrect:hover {
+            background: #ef4444;
+            color: white;
+            transform: scale(1.1);
+        }
+        .history-fb-done {
+            font-size: 14px;
+            padding: 2px 6px;
+        }
+        .history-fb-done.correct {
+            color: #10b981;
+        }
+        .history-fb-done.incorrect {
+            color: #ef4444;
+        }
+        .history-item.feedback-given {
+            opacity: 0.7;
+        }
+        .history-item.feedback-correct {
+            border-left: 3px solid #10b981;
+        }
+        .history-item.feedback-incorrect {
+            border-left: 3px solid #ef4444;
+        }
+        
+        /* Sentence Card Styles */
+        .sentence-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(6, 95, 70, 0.15));
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .sentence-card .card-header-simple {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .sentence-controls {
+            display: flex;
+            gap: 8px;
+        }
+        .sentence-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .sentence-btn:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+        }
+        .sentence-content {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .pause-indicator {
+            position: relative;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            display: none;
+        }
+        .pause-indicator.active {
+            display: block;
+        }
+        .pause-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 2px;
+            transition: width 0.1s linear;
+            width: 0%;
+        }
+        .pause-text {
+            position: absolute;
+            right: 0;
+            top: 6px;
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        .sentence-display {
+            min-height: 60px;
+            padding: 12px 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            font-family: 'Noto Sans Arabic', 'Amiri', serif;
+            font-size: 1.5rem;
+            line-height: 1.8;
+            word-wrap: break-word;
+            color: #ffffff;
+        }
+        .sentence-placeholder {
+            opacity: 0.4;
+            font-style: italic;
+        }
+        .current-word-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            background: rgba(16, 185, 129, 0.15);
+            border-radius: 6px;
+            border-left: 3px solid #10b981;
+        }
+        .current-word-label {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+        .current-word {
+            flex: 1;
+            font-family: 'Noto Sans Arabic', 'Amiri', serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #10b981;
+        }
+        .urdu-small {
+            font-family: 'Noto Sans Arabic', serif;
+            font-size: 0.8rem;
+        }
+        .english-small {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+        .word-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .word-action-btn {
+            flex: 1;
+            min-width: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: inherit;
+        }
+        .word-action-btn:hover {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(16, 185, 129, 0.5);
+        }
+        .word-action-btn:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <!-- Browser Mode Banner -->
+    <div class="browser-mode-banner">
+        <span class="icon">🌐</span>
+        <span>Browser Mode - No server required! All processing happens locally.</span>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">👋</div>
+                    <div class="title-group">
+                        <h1 class="title-main urdu">ISHARAPAL</h1>
+                        <p class="title-sub">پاکستانی اشاراتی زبان</p>
+                    </div>
+                </div>
+                
+                <div class="header-status">
+                    <div class="connection-badge browser-mode" id="connectionBadge" role="status" aria-live="polite">
+                        <span class="badge-dot connected" id="statusDot" aria-hidden="true"></span>
+                        <span class="badge-text" id="statusText">Browser Mode</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="workspace-grid">
+                
+                <!-- Left Column: Video Feed -->
+                <div class="video-column">
+                    <div class="video-card">
+                        <!-- Video Header - Compact -->
+                        <div class="card-header-simple">
+                            <h2 class="card-title-simple">
+                                <span class="icon">📹</span>
+                                Camera
+                            </h2>
+                            <div class="hand-detection-status" id="handStatus" role="status" aria-live="polite">
+                                <span class="status-icon" aria-hidden="true">✋</span>
+                                <span class="status-label">No hands</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Video Container -->
+                        <div class="video-container">
+                            <div class="video-wrapper">
+                                <video id="webcam" autoplay muted playsinline aria-label="Camera feed for sign language input"></video>
+                                <canvas id="overlay-canvas" aria-hidden="true"></canvas>
+                            </div>
+                            
+                            <!-- Buffer Progress Bar - Minimal -->
+                            <div class="buffer-progress-container-simple">
+                                <div class="buffer-progress-bar">
+                                    <div class="buffer-progress-fill" id="bufferFill"></div>
+                                </div>
+                                <div class="buffer-status-text-simple" id="bufferStatusText">
+                                    <span id="bufferCount">0/45</span> frames
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <div class="control-panel">
+                            <button id="startBtn" class="btn btn-start" aria-label="Start sign language recognition (Press Space or Enter)">
+                                <span class="btn-icon" aria-hidden="true">▶</span>
+                                <span class="btn-text">
+                                    <span class="urdu">شروع کریں</span>
+                                    <span class="english">Start Recognition</span>
+                                </span>
+                            </button>
+                            <button id="stopBtn" class="btn btn-stop" disabled aria-label="Stop recognition (Press Esc)">
+                                <span class="btn-icon" aria-hidden="true">⏸</span>
+                                <span class="btn-text">
+                                    <span class="urdu">روکیں</span>
+                                    <span class="english">Stop</span>
+                                </span>
+                            </button>
+                            <button id="resetBtn" class="btn btn-reset" aria-label="Reset system (Press R)">
+                                <span class="btn-icon" aria-hidden="true">↻</span>
+                                <span class="btn-text">
+                                    <span class="urdu">ری سیٹ</span>
+                                    <span class="english">Reset</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Compact Stats Bar -->
+                    <div class="stats-bar">
+                        <div class="stat-item">
+                            <span class="stat-icon">⚡</span>
+                            <span class="stat-value" id="systemStatusValue">Ready</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">📊</span>
+                            <span class="stat-value" id="signCountValue">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">⏱</span>
+                            <span class="stat-value"><span id="fpsValue">0</span> FPS</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Column: Prediction & History -->
+                <div class="results-column">
+                    
+                    <!-- Current Prediction Card -->
+                    <div class="prediction-card">
+                        <div class="card-header-simple">
+                            <h2 class="card-title-simple">
+                                <span class="icon">✨</span>
+                                Current Sign
+                            </h2>
+                        </div>
+                        
+                        <div class="prediction-content">
+                            <!-- Prediction Display -->
+                            <div class="prediction-display" id="predictionDisplay" role="status" aria-live="assertive" aria-atomic="true">
+                                <div class="prediction-placeholder">
+                                    <div class="placeholder-icon" aria-hidden="true">👋</div>
+                                    <div class="placeholder-text">
+                                        <span class="urdu">اشارہ دکھائیں</span>
+                                        <span class="english">Show a sign to begin</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Confidence Meter - Simplified -->
+                            <div class="confidence-section-simple">
+                                <div class="confidence-header-simple">
+                                    <span class="confidence-label-simple">Confidence</span>
+                                    <span class="confidence-value" id="confidenceValue">0%</span>
+                                </div>
+                                <div class="confidence-bar">
+                                    <div class="confidence-fill" id="confidenceFill"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Feedback Section -->
+                        <div class="feedback-section" id="feedbackSection">
+                            <div class="feedback-header">
+                                <span class="urdu">کیا یہ صحیح ہے؟</span>
+                                <span class="english">Was this correct?</span>
+                            </div>
+                            <div class="feedback-buttons">
+                                <button id="feedbackCorrect" class="feedback-btn feedback-correct" aria-label="Mark prediction as correct (Press C)">
+                                    <span class="feedback-icon" aria-hidden="true">✓</span>
+                                    <span class="feedback-text">
+                                        <span class="urdu">صحیح</span>
+                                        <span class="english">Correct</span>
+                                    </span>
+                                </button>
+                                <button id="feedbackIncorrect" class="feedback-btn feedback-incorrect" aria-label="Mark prediction as incorrect (Press I)">
+                                    <span class="feedback-icon" aria-hidden="true">✗</span>
+                                    <span class="feedback-text">
+                                        <span class="urdu">غلط</span>
+                                        <span class="english">Incorrect</span>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Word/Sentence Formation Card -->
+                    <div class="sentence-card">
+                        <div class="card-header-simple">
+                            <h3 class="card-title-simple">
+                                <span class="icon">📖</span>
+                                <span class="urdu-small">الفاظ</span>
+                                Word Formation
+                            </h3>
+                            <div class="sentence-controls">
+                                <button class="sentence-btn" id="copyTextBtn" title="Copy to clipboard">
+                                    <span>📋</span>
+                                </button>
+                                <button class="sentence-btn" id="clearTextBtn" title="Clear all">
+                                    <span>🗑️</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="sentence-content">
+                            <!-- Pause Progress Indicator -->
+                            <div class="pause-indicator" id="pauseIndicator">
+                                <div class="pause-progress" id="pauseProgress"></div>
+                                <span class="pause-text" id="pauseText">Word forming...</span>
+                            </div>
+                            
+                            <!-- Sentence Display (RTL for Urdu) -->
+                            <div class="sentence-display urdu" id="sentenceDisplay" dir="rtl">
+                                <span class="sentence-placeholder">الفاظ یہاں ظاہر ہوں گے</span>
+                            </div>
+                            
+                            <!-- Current Word Being Formed -->
+                            <div class="current-word-section">
+                                <div class="current-word-label">
+                                    <span class="urdu-small">موجودہ لفظ:</span>
+                                    <span class="english-small">Current word:</span>
+                                </div>
+                                <div class="current-word urdu" id="currentWordDisplay" dir="rtl">-</div>
+                            </div>
+                            
+                            <!-- Quick Actions -->
+                            <div class="word-actions">
+                                <button class="word-action-btn" id="addSpaceBtn" title="Complete word (add space)">
+                                    <span class="urdu-small">فاصلہ</span>
+                                    <span class="english-small">Space</span>
+                                </button>
+                                <button class="word-action-btn" id="deleteLetterBtn" title="Delete last letter">
+                                    <span class="urdu-small">حرف مٹائیں</span>
+                                    <span class="english-small">Delete</span>
+                                </button>
+                                <button class="word-action-btn" id="deleteWordBtn" title="Delete last word">
+                                    <span class="urdu-small">لفظ مٹائیں</span>
+                                    <span class="english-small">Undo Word</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- History Card - Compact -->
+                    <div class="history-card">
+                        <div class="card-header-simple">
+                            <h3 class="card-title-simple">
+                                <span class="icon">📝</span>
+                                Recent Signs
+                            </h3>
+                            <button class="clear-history-btn" id="clearHistoryBtn" style="display: none;">Clear</button>
+                        </div>
+                        
+                        <div class="history-content-compact">
+                            <div class="history-list" id="historyList">
+                                <div class="history-empty-simple">
+                                    <span class="english">No signs yet</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">
+                <span class="urdu">پاکستانی اشاراتی زبان شناسی نظام</span>
+                <span class="divider">|</span>
+                <span class="english">Pakistan Sign Language Recognition - Browser Edition</span>
+                <span class="divider">|</span>
+                <span class="english">40 Urdu Alphabet Signs</span>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Camera Error Modal -->
+    <div class="camera-error-modal" id="cameraErrorModal" style="display: none;">
+        <div class="camera-error-content">
+            <div class="camera-error-icon">📹</div>
+            <h3 class="camera-error-title">Camera Access Required</h3>
+            <p class="camera-error-message" id="cameraErrorMessage">
+                Please allow camera access to use sign language recognition.
+            </p>
+            <div class="camera-error-actions">
+                <button class="btn btn-start" id="retryCameraBtn">
+                    <span class="btn-text">Try Again</span>
+                </button>
+                <button class="btn btn-reset" id="closeCameraErrorBtn">
+                    <span class="btn-text">Close</span>
+                </button>
+            </div>
+            <div class="camera-error-help">
+                <details>
+                    <summary>How to enable camera access</summary>
+                    <ol>
+                        <li>Click the camera icon in your browser's address bar</li>
+                        <li>Select "Allow" for camera permissions</li>
+                        <li>Refresh the page if needed</li>
+                    </ol>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Correction Modal (for Incorrect Feedback) -->
+    <div class="correction-modal" id="correctionModal" style="display: none;">
+        <div class="correction-modal-content">
+            <div class="correction-modal-header">
+                <h3 class="correction-modal-title">
+                    <span class="urdu">صحیح اشارہ کا انتخاب کریں</span>
+                    <span class="english">Select the Correct Sign</span>
+                </h3>
+                <button class="correction-modal-close" id="closeCorrectionModal" aria-label="Close">×</button>
+            </div>
+            
+            <div class="correction-modal-body">
+                <p class="correction-modal-instruction">
+                    <span class="urdu">ماڈل نے "<span id="incorrectPredictionLabel">-</span>" پیش گوئی کی۔ براہ کرم بتائیں کہ آپ نے کون سا اشارہ کیا:</span>
+                    <span class="english">The model predicted "<span id="incorrectPredictionLabelEn">-</span>". Please select what sign you actually performed:</span>
+                </p>
+                
+                <!-- Searchable dropdown for 40 signs -->
+                <div class="sign-selector">
+                    <input type="text" 
+                           id="signSearchInput" 
+                           class="sign-search-input" 
+                           placeholder="Search signs... / اشارہ تلاش کریں"
+                           autocomplete="off">
+                    <div class="sign-list" id="signList">
+                        <!-- Signs will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="selected-sign-display" id="selectedSignDisplay" style="display: none;">
+                    <span class="urdu">منتخب کردہ:</span>
+                    <span class="english">Selected:</span>
+                    <strong id="selectedSignLabel">-</strong>
+                </div>
+            </div>
+            
+            <div class="correction-modal-footer">
+                <button class="btn btn-reset" id="cancelCorrectionBtn">
+                    <span class="btn-text">
+                        <span class="urdu">منسوخ کریں</span>
+                        <span class="english">Cancel</span>
+                    </span>
+                </button>
+                <button class="btn btn-start" id="submitCorrectionBtn" disabled>
+                    <span class="btn-text">
+                        <span class="urdu">جمع کروائیں</span>
+                        <span class="english">Submit Correction</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+    
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p class="loading-title">
+                <span class="urdu">لوڈ ہو رہا ہے...</span>
+                <span class="english">Initializing Browser Mode</span>
+            </p>
+            <p class="loading-subtitle" id="loadingProgress">
+                Loading AI model (~11MB)...
+            </p>
+            <p class="loading-hint" style="font-size: 0.85rem; opacity: 0.7; margin-top: 8px;">
+                First load may take 30-60 seconds. Model will be cached for faster loads.
+            </p>
+        </div>
+    </div>
+
+    <!-- JavaScript - Browser-Only Version -->
+    <!-- Core camera with MediaPipe -->
+    <script src="js/camera.js"></script>
+    
+    <!-- Visualization -->
+    <script src="js/visualization.js"></script>
+    <script src="js/ui.js"></script>
+    
+    <!-- Browser-Only Components (NO WebSocket needed) -->
+    <script src="js/onnx_predictor.js"></script>
+    <script src="js/firebase_config.js"></script>
+    <script src="js/cloud_sync.js"></script>
+    <script src="js/feedback_manager.js"></script>
+    <script src="js/word_formation.js"></script>
+    <script src="js/app_browser.js"></script>
+    
+    <!-- Initialize App -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('='.repeat(60));
+            console.log('ISHARAPAL - Browser-Only Mode');
+            console.log('No server required - all processing happens locally!');
+            console.log('='.repeat(60));
+            
+            const app = new PSLRecognitionApp();
+            app.init();
+            window.pslApp = app;
+            
+            // Debug: expose predictor for testing
+            window.debugPredictor = () => app.predictor;
+            window.debugFeedback = () => app.feedbackManager;
+        });
+        
+        // Register Service Worker for offline capability
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('[PWA] Service Worker registered:', registration.scope);
+                        
+                        // Check for updates
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            console.log('[PWA] New Service Worker installing...');
+                            
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('[PWA] New version available! Refresh to update.');
+                                    // Optionally show update notification
+                                    if (window.pslApp) {
+                                        window.pslApp.showNotification('Update available! Refresh to get latest version.', 'info');
+                                    }
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.warn('[PWA] Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
+

@@ -29,8 +29,9 @@
                 <div class="logo-section">
                     <div class="logo-icon">👋</div>
                     <div class="title-group">
-                        <h1 class="title-main urdu">پاکستانی اشاراتی زبان</h1>
-                        <p class="title-sub">Pakistan Sign Language Recognition System</p>
+                        <h1 class="title-main urdu">ISHARAPAL</h1>
+                        <p class="title-sub">پاکستانی اشاراتی زبان</p>
+                       
                     </div>
                 </div>
                 
@@ -163,7 +164,7 @@
                         </div>
                         
                         <!-- Feedback Section -->
-                        <div class="feedback-section" id="feedbackSection" style="display: none;">
+                        <div class="feedback-section" id="feedbackSection">
                             <div class="feedback-header">
                                 <span class="urdu">کیا یہ صحیح ہے؟</span>
                                 <span class="english">Was this correct?</span>
@@ -260,6 +261,59 @@
                         <li>Refresh the page if needed</li>
                     </ol>
                 </details>
+            </div>
+        </div>
+    </div>
+
+    <!-- Correction Modal (for Incorrect Feedback) -->
+    <div class="correction-modal" id="correctionModal" style="display: none;">
+        <div class="correction-modal-content">
+            <div class="correction-modal-header">
+                <h3 class="correction-modal-title">
+                    <span class="urdu">صحیح اشارہ کا انتخاب کریں</span>
+                    <span class="english">Select the Correct Sign</span>
+                </h3>
+                <button class="correction-modal-close" id="closeCorrectionModal" aria-label="Close">×</button>
+            </div>
+            
+            <div class="correction-modal-body">
+                <p class="correction-modal-instruction">
+                    <span class="urdu">ماڈل نے "<span id="incorrectPredictionLabel">-</span>" پیش گوئی کی۔ براہ کرم بتائیں کہ آپ نے کون سا اشارہ کیا:</span>
+                    <span class="english">The model predicted "<span id="incorrectPredictionLabelEn">-</span>". Please select what sign you actually performed:</span>
+                </p>
+                
+                <!-- Searchable dropdown for 40 signs -->
+                <div class="sign-selector">
+                    <input type="text" 
+                           id="signSearchInput" 
+                           class="sign-search-input" 
+                           placeholder="Search signs... / اشارہ تلاش کریں"
+                           autocomplete="off">
+                    <div class="sign-list" id="signList">
+                        <!-- Signs will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="selected-sign-display" id="selectedSignDisplay" style="display: none;">
+                    <span class="urdu">منتخب کردہ:</span>
+                    <span class="english">Selected:</span>
+                    <strong id="selectedSignLabel">-</strong>
+                </div>
+            </div>
+            
+            <div class="correction-modal-footer">
+                <button class="btn btn-reset" id="cancelCorrectionBtn">
+                    <span class="btn-text">
+                        <span class="urdu">منسوخ کریں</span>
+                        <span class="english">Cancel</span>
+                    </span>
+                </button>
+                <button class="btn btn-start" id="submitCorrectionBtn" disabled>
+                    <span class="btn-text">
+                        <span class="urdu">جمع کروائیں</span>
+                        <span class="english">Submit Correction</span>
+                    </span>
+                </button>
             </div>
         </div>
     </div>

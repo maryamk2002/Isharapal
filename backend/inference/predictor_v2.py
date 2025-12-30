@@ -112,6 +112,14 @@ class RealTimePredictorV2:
         self.last_stable_confidence = 0.0
         self.last_stable_time = None  # Use None instead of 0.0 to avoid falsy check bug
         
+        # NEW: Exponential moving average for softmax smoothing
+        self.ema_alpha = 0.7  # Higher = more responsive (0.7 = 70% new, 30% old)
+        self.ema_probabilities = None  # Will be initialized on first prediction
+        self.last_raw_prediction = None  # Track raw prediction for EMA reset
+        
+        # NEW: Low confidence threshold for "searching" state
+        self.low_confidence_threshold = 0.45  # Slightly lower for better responsiveness
+        
         # Performance monitoring
         self.stats = {
             'total_predictions': 0,
@@ -124,6 +132,12 @@ class RealTimePredictorV2:
         
         # Thread lock for thread-safe operations
         self.lock = threading.Lock()
+        
+        # Processing state flag for graceful shutdown
+        # When True, the predictor is actively running inference
+        # Stop commands should wait for this to become False
+        self.is_processing = False
+        self._stop_requested = False  # Flag to request graceful stop
         
         logger.info(f"[OK] Real-time predictor V2 initialized on {self.device}")
         logger.info(f"  Model: {type(model).__name__}")
@@ -207,6 +221,9 @@ class RealTimePredictorV2:
                 }
             
             try:
+                # Set processing flag (for graceful shutdown)
+                self.is_processing = True
+                
                 start_time = time.time()
                 
                 # Get current sequence from buffer
@@ -222,17 +239,40 @@ class RealTimePredictorV2:
                 # Make prediction
                 with torch.no_grad():
                     logits = self.model(sequence_tensor)
-                    probabilities = torch.softmax(logits, dim=1)
-                    confidence, predicted_idx = torch.max(probabilities, dim=1)
+                    raw_probabilities = torch.softmax(logits, dim=1)
+                    raw_probs_np = raw_probabilities.squeeze().cpu().numpy()
                     
-                    predicted_label = self.labels[predicted_idx.item()]
-                    confidence_score = confidence.item()
+                    # Get raw prediction (before smoothing)
+                    raw_predicted_idx = np.argmax(raw_probs_np)
+                    raw_predicted_label = self.labels[raw_predicted_idx]
+                    raw_confidence = float(raw_probs_np[raw_predicted_idx])
+                    
+                    # Reset EMA if raw prediction changed (for responsiveness)
+                    if self.last_raw_prediction is not None and raw_predicted_label != self.last_raw_prediction:
+                        # New sign detected - reset EMA for faster response
+                        self.ema_probabilities = raw_probs_np.copy()
+                        logger.debug(f"EMA reset: {self.last_raw_prediction} -> {raw_predicted_label}")
+                    elif self.ema_probabilities is None:
+                        self.ema_probabilities = raw_probs_np.copy()
+                    else:
+                        # EMA: new_ema = alpha * new_value + (1 - alpha) * old_ema
+                        self.ema_probabilities = (
+                            self.ema_alpha * raw_probs_np + 
+                            (1 - self.ema_alpha) * self.ema_probabilities
+                        )
+                    
+                    self.last_raw_prediction = raw_predicted_label
+                    
+                    # Use smoothed probabilities for prediction
+                    smoothed_probs = self.ema_probabilities
+                    predicted_idx = np.argmax(smoothed_probs)
+                    confidence_score = float(smoothed_probs[predicted_idx])
+                    predicted_label = self.labels[predicted_idx]
                 
-                # Get all predictions if requested
+                # Get all predictions if requested (using smoothed probabilities)
                 all_predictions = []
                 if return_all_predictions:
-                    probs = probabilities.squeeze().cpu().numpy()
-                    for label, prob in zip(self.labels, probs):
+                    for label, prob in zip(self.labels, smoothed_probs):
                         all_predictions.append({'label': label, 'confidence': float(prob)})
                     # Sort by confidence
                     all_predictions.sort(key=lambda x: x['confidence'], reverse=True)
@@ -262,7 +302,7 @@ class RealTimePredictorV2:
                     # 2. Same label but enough time has passed (allow repeated signs)
                     time_since_last = time.time() - self.last_stable_time if self.last_stable_time is not None else 999
                     is_different_label = (stable_label != self.last_stable_prediction)
-                    is_timeout_passed = (time_since_last > 3.0)  # 3 seconds between same sign (increased to avoid false re-triggers)
+                    is_timeout_passed = (time_since_last > 30.0)  # 30 seconds - only re-trigger same sign after long pause
                     
                     is_new = is_different_label or is_timeout_passed
                     
@@ -286,6 +326,14 @@ class RealTimePredictorV2:
                 prediction_time = time.time() - start_time
                 self._update_stats(prediction_time, confidence_score, True)
                 
+                # Determine status based on confidence
+                if confidence_score < self.low_confidence_threshold:
+                    status = 'low_confidence'  # Frontend should show "Searching..."
+                elif stable_prediction is None:
+                    status = 'collecting_stability'
+                else:
+                    status = 'success'
+                
                 # Prepare result
                 result = {
                     'ready': True,
@@ -295,10 +343,11 @@ class RealTimePredictorV2:
                     'stable_confidence': stable_prediction[1] if stable_prediction else 0.0,
                     'is_stable': stable_prediction is not None,
                     'is_new': is_new,
+                    'is_low_confidence': confidence_score < self.low_confidence_threshold,
                     'all_predictions': all_predictions,
                     'buffer_size': len(self.frame_buffer),
                     'prediction_time_ms': prediction_time * 1000,
-                    'status': 'success'
+                    'status': status
                 }
                 
                 logger.debug(
@@ -318,6 +367,10 @@ class RealTimePredictorV2:
                     'error': str(e),
                     'buffer_size': len(self.frame_buffer)
                 }
+            
+            finally:
+                # Always clear processing flag when done
+                self.is_processing = False
     
     def _get_stable_prediction(self) -> Optional[Tuple[str, float]]:
         """
@@ -409,6 +462,8 @@ class RealTimePredictorV2:
             self.last_stable_prediction = None
             self.last_stable_confidence = 0.0
             self.last_stable_time = None  # Reset timer
+            self.ema_probabilities = None  # Reset EMA smoothing
+            self.last_raw_prediction = None  # Reset raw prediction tracking
             self.stats['buffer_resets'] += 1
             logger.info("[RESET] Buffer and prediction state cleared")
     
@@ -420,6 +475,50 @@ class RealTimePredictorV2:
             self.last_stable_confidence = 0.0
             self.last_stable_time = None  # Reset timer
             logger.debug("Stable prediction state reset (buffer kept)")
+    
+    def request_stop(self):
+        """Request a graceful stop. Processing will complete current inference."""
+        self._stop_requested = True
+        logger.info("Graceful stop requested")
+    
+    def wait_for_processing(self, timeout_sec: float = 5.0) -> bool:
+        """
+        Wait for current processing to complete.
+        
+        Args:
+            timeout_sec: Maximum time to wait (default: 5 seconds)
+            
+        Returns:
+            True if processing completed, False if timeout occurred
+        """
+        start_time = time.time()
+        while self.is_processing:
+            if time.time() - start_time > timeout_sec:
+                logger.warning(f"Timeout waiting for processing to complete after {timeout_sec}s")
+                return False
+            time.sleep(0.05)  # 50ms poll interval
+        return True
+    
+    def is_stop_requested(self) -> bool:
+        """Check if a graceful stop has been requested."""
+        return self._stop_requested
+    
+    def clear_stop_request(self):
+        """Clear the stop request flag (for restart)."""
+        self._stop_requested = False
+    
+    def get_current_sequence(self) -> Optional[np.ndarray]:
+        """
+        Get the current frame buffer as a numpy array.
+        Useful for saving feedback samples.
+        
+        Returns:
+            Numpy array of shape (N, 189) or None if buffer is empty
+        """
+        with self.lock:
+            if len(self.frame_buffer) == 0:
+                return None
+            return np.array(list(self.frame_buffer))
     
     def get_stats(self) -> Dict[str, Any]:
         """Get performance statistics."""

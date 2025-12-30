@@ -37,9 +37,12 @@ class WebSocketManager {
             this.socket = io(serverUrl, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
-                reconnectionAttempts: this.maxReconnectAttempts,
-                reconnectionDelay: this.reconnectDelay,
-                timeout: 10000
+                reconnectionAttempts: 10,  // More attempts
+                reconnectionDelay: 1000,   // Faster reconnect
+                reconnectionDelayMax: 5000,
+                timeout: 30000,            // Longer timeout
+                pingTimeout: 120000,       // 2 minute ping timeout
+                pingInterval: 10000        // 10 second ping interval
             });
             
             // Set up event listeners
@@ -82,11 +85,23 @@ class WebSocketManager {
             }
         });
         
-        this.socket.on('disconnect', () => {
-            console.log('Socket disconnected');
+        this.socket.on('disconnect', (reason) => {
+            console.log('Socket disconnected. Reason:', reason);
             this.connected = false;
             if (this.onConnectionChange) {
                 this.onConnectionChange(false);
+            }
+            
+            // Auto-reconnect for transient issues with progressive retry
+            const reconnectableReasons = [
+                'io server disconnect', 
+                'ping timeout', 
+                'transport close',
+                'transport error'
+            ];
+            
+            if (reconnectableReasons.includes(reason)) {
+                this.attemptReconnect();
             }
         });
         
@@ -138,6 +153,16 @@ class WebSocketManager {
                 this.onError({message: 'Could not reconnect to server'});
             }
         });
+        
+        // Successful reconnection
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log(`✓ Reconnected successfully after ${attemptNumber} attempts`);
+            this.connected = true;
+            this.reconnectAttempts = 0;
+            if (this.onConnectionChange) {
+                this.onConnectionChange(true);
+            }
+        });
     }
     
     handleFrameProcessed(data) {
@@ -158,27 +183,33 @@ class WebSocketManager {
         
         // Handle prediction data - V2 ENHANCED
         if (data.prediction && data.prediction.is_stable) {
-            // Only process NEW stable predictions to avoid flickering
-            if (data.prediction.is_new) {
-                const prediction = {
-                    label: data.prediction.label,
-                    confidence: data.prediction.confidence,
-                    timestamp: Date.now(),
-                    isNew: true,
-                    isStable: true
-                };
-                
+            const prediction = {
+                label: data.prediction.label,
+                confidence: data.prediction.confidence,
+                timestamp: Date.now(),
+                isNew: data.prediction.is_new,
+                isStable: true
+            };
+            
+            // Check if this is a different prediction from the last one we displayed
+            const isDifferent = !this.lastPrediction || 
+                                this.lastPrediction.label !== prediction.label;
+            
+            // Only trigger callback and add to history for NEW predictions
+            if (data.prediction.is_new || isDifferent) {
                 this.lastPrediction = prediction;
                 
-                // Add to history
-                this.addToHistory(prediction);
+                // Add to history only for new predictions
+                if (data.prediction.is_new) {
+                    this.addToHistory(prediction);
+                }
                 
-                // Trigger callback
+                // Trigger callback for UI update
                 if (this.onPredictionReceived) {
                     this.onPredictionReceived(prediction);
                 }
                 
-                console.log(`✓ NEW Prediction: ${prediction.label} (${(prediction.confidence * 100).toFixed(1)}%)`);
+                console.log(`✓ ${data.prediction.is_new ? 'NEW' : 'UPDATED'} Prediction: ${prediction.label} (${(prediction.confidence * 100).toFixed(1)}%)`);
             }
         }
     }
@@ -202,7 +233,103 @@ class WebSocketManager {
         this.socket.emit('start_recognition', {});
         this.framesSent = 0;
         this.framesProcessed = 0;
+        this.lastPrediction = null;  // RESET: Allow first prediction to display
+        this.predictionHistory = [];  // RESET: Clear old history
+        
+        // Start keep-alive interval to prevent timeout during long sessions
+        this.startKeepAlive();
+        
         return true;
+    }
+    
+    startKeepAlive() {
+        this.stopKeepAlive();  // Clear any existing
+        
+        // More aggressive keep-alive: 15 seconds (browsers throttle timers when hidden)
+        this.keepAliveInterval = setInterval(() => {
+            if (this.connected && this.socket) {
+                this.socket.emit('ping_keep_alive', { timestamp: Date.now() });
+            }
+        }, 15000);  // Every 15 seconds
+        
+        // Setup visibility change handler to reconnect when tab becomes visible
+        this.setupVisibilityHandler();
+    }
+    
+    stopKeepAlive() {
+        if (this.keepAliveInterval) {
+            clearInterval(this.keepAliveInterval);
+            this.keepAliveInterval = null;
+        }
+        this.removeVisibilityHandler();
+    }
+    
+    /**
+     * Progressive reconnection with exponential backoff
+     */
+    attemptReconnect(attempt = 1) {
+        const maxAttempts = 5;
+        const baseDelay = 1000;  // 1 second
+        
+        if (attempt > maxAttempts) {
+            console.error(`❌ Reconnection failed after ${maxAttempts} attempts`);
+            if (this.onError) {
+                this.onError({ message: 'Could not reconnect to server. Please refresh the page.' });
+            }
+            return;
+        }
+        
+        const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), 10000);  // Max 10s
+        console.log(`🔄 Attempting reconnection (attempt ${attempt}/${maxAttempts}) in ${delay}ms...`);
+        
+        setTimeout(() => {
+            if (!this.connected && this.socket) {
+                this.socket.connect();
+                
+                // Check if reconnection succeeded after 2 seconds
+                setTimeout(() => {
+                    if (!this.connected) {
+                        this.attemptReconnect(attempt + 1);
+                    } else {
+                        console.log('✓ Reconnection successful!');
+                    }
+                }, 2000);
+            }
+        }, delay);
+    }
+    
+    /**
+     * Handle tab visibility changes - reconnect immediately when tab becomes visible
+     */
+    setupVisibilityHandler() {
+        this._visibilityHandler = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[WebSocket] Tab visible - checking connection...');
+                
+                if (this.socket && !this.connected) {
+                    console.log('[WebSocket] Not connected, forcing reconnect...');
+                    this.socket.connect();
+                } else if (this.socket && this.connected) {
+                    // Send immediate ping to verify connection is alive
+                    this.socket.emit('ping_keep_alive', { 
+                        timestamp: Date.now(),
+                        reason: 'visibility_check'
+                    });
+                }
+            }
+        };
+        
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+    }
+    
+    /**
+     * Remove visibility handler
+     */
+    removeVisibilityHandler() {
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
     }
     
     stopRecognition() {
@@ -212,6 +339,11 @@ class WebSocketManager {
         
         console.log('Stopping recognition...');
         this.socket.emit('stop_recognition', {});
+        this.lastPrediction = null;  // RESET: Allow fresh predictions on restart
+        
+        // Stop keep-alive when recognition stops
+        this.stopKeepAlive();
+        
         return true;
     }
     
@@ -241,6 +373,39 @@ class WebSocketManager {
             return true;
         } catch (error) {
             console.error('Error sending frame:', error);
+            return false;
+        }
+    }
+    
+    /**
+     * V3: Send pre-extracted landmarks from frontend MediaPipe.
+     * Payload: ~2KB JSON vs ~150KB Base64 image (98% reduction!)
+     */
+    sendLandmarks(data) {
+        if (!this.connected) {
+            // Log when not connected to debug
+            if (this.framesSent % 30 === 0) {
+                console.warn('[WS] Not connected, skipping landmark send');
+            }
+            return false;
+        }
+        
+        try {
+            this.socket.emit('landmark_data', {
+                landmarks: data.landmarks,
+                has_hands: data.hasHands,
+                hand_count: data.handCount
+            });
+            this.framesSent++;
+            
+            // Debug: Log every 60 frames to confirm data is being sent
+            if (this.framesSent % 60 === 0) {
+                console.log(`[WS] Sent ${this.framesSent} landmark frames, hasHands: ${data.hasHands}`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error sending landmarks:', error);
             return false;
         }
     }
@@ -302,6 +467,7 @@ class WebSocketManager {
     }
     
     destroy() {
+        this.stopKeepAlive();
         this.disconnect();
         this.socket = null;
         this.onConnectionChange = null;

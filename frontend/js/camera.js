@@ -19,6 +19,7 @@ class CameraManager {
         // MediaPipe hands
         this.hands = null;
         this.camera = null;
+        this.mediaPipeBusy = false;  // Prevent concurrent send() calls
         
         // Event listeners
         this.listeners = new Map();
@@ -31,6 +32,53 @@ class CameraManager {
             lastFrameTime: 0,
             avgFrameTime: 0
         };
+        
+        // Throttling for "no hands" events to prevent flooding
+        this.lastNoHandsEmit = 0;
+        this.noHandsThrottleMs = 200; // Only emit "no hands" every 200ms max
+        this.consecutiveNoHands = 0;
+        
+        // Watchdog timer to detect MediaPipe freezes
+        this.lastMediaPipeResponse = Date.now();
+        this.watchdogInterval = null;
+        this.mediaPipeFreezeThreshold = 5000; // 5 seconds without response = frozen
+        
+        // Clear global MediaPipe on page unload to prevent memory issues
+        window.addEventListener('beforeunload', () => {
+            if (window.globalMediaPipeHands) {
+                try {
+                    window.globalMediaPipeHands.close();
+                } catch (e) {
+                    // Ignore errors during cleanup
+                }
+                window.globalMediaPipeHands = null;
+            }
+        });
+        
+        // Handle tab visibility changes to prevent MediaPipe freezes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Tab hidden - pausing frame capture');
+                // Don't stop completely, just slow down
+                this.noHandsThrottleMs = 1000; // Slow emissions when hidden
+            } else {
+                console.log('Tab visible - resuming frame capture');
+                this.noHandsThrottleMs = 200; // Normal rate
+                this.lastMediaPipeResponse = Date.now(); // Reset watchdog
+                
+                // Force a keep-alive emission after becoming visible
+                setTimeout(() => {
+                    if (this.isActive) {
+                        this.emit('landmarks', {
+                            landmarks: null,
+                            hasHands: false,
+                            handCount: 0,
+                            isVisibilityResume: true
+                        });
+                    }
+                }, 100);
+            }
+        });
     }
     
     async init() {
@@ -49,9 +97,9 @@ class CameraManager {
                 this.ctx = this.canvas.getContext('2d');
             }
             
-            // V2: SKIP MediaPipe - backend handles it!
-            // await this.initMediaPipe();
-            console.log('✓ V2 Mode: Skipping MediaPipe (backend processes frames)');
+            // V3: MediaPipe runs in FRONTEND for 98% bandwidth reduction!
+            await this.initMediaPipe();
+            console.log('✓ V3 Mode: MediaPipe runs in browser (sending landmarks only)');
 
             if (!this.frameCanvas) {
                 this.frameCanvas = document.createElement('canvas');
@@ -70,16 +118,52 @@ class CameraManager {
     
     async initMediaPipe() {
         try {
-            // CRITICAL: Global singleton to prevent multiple instances across page reloads
-            if (window.globalMediaPipeHands) {
-                console.log('✓ Using global MediaPipe Hands instance (already loaded)');
-                this.hands = window.globalMediaPipeHands;
-                
-                // Re-attach results handler
-                this.hands.onResults((results) => {
-                    this.handleMediaPipeResults(results);
+            // Prevent multiple simultaneous initialization attempts
+            if (window.mediaPipeInitializing) {
+                console.log('⏳ MediaPipe initialization already in progress, waiting...');
+                // Wait for existing initialization to complete
+                await new Promise((resolve) => {
+                    const checkReady = setInterval(() => {
+                        if (!window.mediaPipeInitializing && window.globalMediaPipeHands) {
+                            clearInterval(checkReady);
+                            this.hands = window.globalMediaPipeHands;
+                            this.hands.onResults((results) => {
+                                this.handleMediaPipeResults(results);
+                            });
+                            resolve();
+                        }
+                    }, 200);
+                    // Timeout after 30 seconds
+                    setTimeout(() => {
+                        clearInterval(checkReady);
+                        resolve();
+                    }, 30000);
                 });
-                return;
+                if (this.hands) {
+                    console.log('✓ Using MediaPipe instance from parallel initialization');
+                    return;
+                }
+            }
+            
+            // Check if global instance exists and is valid
+            if (window.globalMediaPipeHands) {
+                try {
+                    // Test if the instance is still valid
+                    console.log('✓ Checking existing MediaPipe Hands instance...');
+                    this.hands = window.globalMediaPipeHands;
+                    
+                    // Re-attach results handler
+                    this.hands.onResults((results) => {
+                        this.handleMediaPipeResults(results);
+                    });
+                    
+                    console.log('✓ Using cached MediaPipe Hands instance');
+                    return;
+                } catch (e) {
+                    // Instance is stale, need to recreate
+                    console.log('⚠️ Cached MediaPipe instance invalid, recreating...');
+                    window.globalMediaPipeHands = null;
+                }
             }
             
             // Check if already initialized locally
@@ -92,15 +176,32 @@ class CameraManager {
                 throw new Error('❌ MediaPipe Hands library not loaded from CDN. Check internet connection.');
             }
             
+            // Mark initialization as in progress
+            window.mediaPipeInitializing = true;
+            
             console.log('⏳ Loading MediaPipe Hands (~10MB WASM files, please wait 10-30 seconds)...');
             this.emit('mediapipe_loading', { status: 'started', message: 'Loading MediaPipe (~10MB)...' });
             
-            // Create hands instance
+            // Track which files have been logged to prevent spam
+            const loggedFiles = new Set();
+            
+            // CDN fallback list for reliability
+            const cdnList = [
+                'https://cdn.jsdelivr.net/npm/@mediapipe/hands/',
+                'https://unpkg.com/@mediapipe/hands/'
+            ];
+            let currentCdnIndex = 0;
+            
+            // Create hands instance with CDN fallback
             this.hands = new Hands({
                 locateFile: (file) => {
-                    console.log(`📥 Loading: ${file}`);
-                    this.emit('mediapipe_loading', { status: 'downloading', message: `Downloading ${file}...` });
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    // Only log each file once to prevent spam
+                    if (!loggedFiles.has(file)) {
+                        loggedFiles.add(file);
+                        console.log(`📥 Loading: ${file}`);
+                        this.emit('mediapipe_loading', { status: 'downloading', message: `Downloading ${file}...` });
+                    }
+                    return cdnList[currentCdnIndex] + file;
                 }
             });
             
@@ -122,58 +223,46 @@ class CameraManager {
             
             // Store globally to prevent re-initialization
             window.globalMediaPipeHands = this.hands;
+            window.mediaPipeInitializing = false;
             
             console.log('✅ MediaPipe Hands fully loaded and ready!');
             
         } catch (error) {
+            window.mediaPipeInitializing = false;
             console.error('❌ MediaPipe initialization failed:', error);
             throw error;
         }
     }
     
     async waitForMediaPipeReady() {
+        // SIMPLIFIED: Just set the real handler immediately and resolve
+        // The old test-based approach was causing delays and handler issues
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                reject(new Error('MediaPipe loading timeout (30s). Check your internet connection and try refreshing the page.'));
-            }, 30000); // 30 second timeout
+                reject(new Error('MediaPipe loading timeout (10s). Check your internet connection.'));
+            }, 10000); // 10 second timeout
             
-            // MediaPipe doesn't have a direct "ready" event, so we test it
-            // by sending a small dummy image and waiting for the first result
-            const testCanvas = document.createElement('canvas');
-            testCanvas.width = 100;
-            testCanvas.height = 100;
-            const testCtx = testCanvas.getContext('2d');
-            testCtx.fillStyle = '#000000';
-            testCtx.fillRect(0, 0, 100, 100);
+            console.log('⏳ Initializing MediaPipe handler...');
+            this.emit('mediapipe_loading', { status: 'initializing', message: 'Setting up hand detection...' });
             
-            console.log('⏳ Testing MediaPipe with dummy frame...');
-            this.emit('mediapipe_loading', { status: 'testing', message: 'Testing MediaPipe initialization...' });
+            // Set the real handler immediately - no test phase
+            this.hands.onResults((results) => {
+                this.handleMediaPipeResults(results);
+            });
             
-            // Listen for first result (means MediaPipe is ready)
-            const testHandler = () => {
+            // MediaPipe is ready when we can call initialize()
+            // Just wait a short moment for WASM to load
+            this.hands.initialize().then(() => {
                 clearTimeout(timeout);
-                console.log('✓ MediaPipe responded to test frame - READY!');
+                console.log('✅ MediaPipe Hands initialized and ready!');
                 this.emit('mediapipe_loading', { status: 'ready', message: 'MediaPipe ready!' });
                 resolve();
-            };
-            
-            this.hands.onResults(testHandler);
-            
-            // Send test frame
-            this.hands.send({ image: testCanvas }).then(() => {
-                console.log('✓ Test frame sent to MediaPipe');
-                // Wait a bit for response
-                setTimeout(() => {
-                    clearTimeout(timeout);
-                    console.log('✓ MediaPipe appears ready (timeout not triggered)');
-                    this.emit('mediapipe_loading', { status: 'ready', message: 'MediaPipe ready!' });
-                    resolve();
-                }, 2000);
             }).catch((err) => {
                 clearTimeout(timeout);
-                console.warn('⚠️ MediaPipe test failed but continuing:', err);
+                console.warn('⚠️ MediaPipe initialize() failed, but handler is set:', err);
+                // Handler is already set, so we can continue
                 this.emit('mediapipe_loading', { status: 'ready', message: 'MediaPipe ready (with warnings)' });
-                resolve(); // Continue anyway
+                resolve();
             });
         });
     }
@@ -293,6 +382,9 @@ class CameraManager {
             this.captureFrame();
         }, interval);
         
+        // Start watchdog timer to detect MediaPipe freezes
+        this.startWatchdog();
+        
         console.log(`Frame capture started at ${this.frameRate} FPS`);
     }
     
@@ -302,7 +394,63 @@ class CameraManager {
             this.frameInterval = null;
         }
         
+        // Stop watchdog
+        this.stopWatchdog();
+        
         console.log('Frame capture stopped');
+    }
+    
+    startWatchdog() {
+        this.stopWatchdog(); // Clear any existing
+        this.lastMediaPipeResponse = Date.now();
+        
+        this.watchdogInterval = setInterval(() => {
+            const timeSinceLastResponse = Date.now() - this.lastMediaPipeResponse;
+            
+            if (timeSinceLastResponse > this.mediaPipeFreezeThreshold) {
+                console.warn(`⚠️ MediaPipe appears frozen (${(timeSinceLastResponse / 1000).toFixed(1)}s without response). Attempting recovery...`);
+                this.attemptMediaPipeRecovery();
+            }
+        }, 2000); // Check every 2 seconds
+    }
+    
+    stopWatchdog() {
+        if (this.watchdogInterval) {
+            clearInterval(this.watchdogInterval);
+            this.watchdogInterval = null;
+        }
+    }
+    
+    async attemptMediaPipeRecovery() {
+        console.log('🔄 Attempting MediaPipe recovery...');
+        
+        // Reset the response timer to prevent repeated recovery attempts
+        this.lastMediaPipeResponse = Date.now();
+        
+        try {
+            // Force re-initialize MediaPipe
+            if (this.hands) {
+                try {
+                    this.hands.reset();
+                } catch (e) {
+                    console.warn('MediaPipe reset failed, continuing:', e);
+                }
+            }
+            
+            // Emit a keep-alive signal to backend
+            this.emit('landmarks', {
+                landmarks: null,
+                hasHands: false,
+                handCount: 0,
+                isRecovery: true
+            });
+            
+            console.log('✅ MediaPipe recovery signal sent');
+            
+        } catch (error) {
+            console.error('❌ MediaPipe recovery failed:', error);
+            this.emit('error', { message: 'MediaPipe recovery failed', error });
+        }
     }
     
     captureFrame() {
@@ -316,16 +464,48 @@ class CameraManager {
             return;
         }
         
+        // Skip if MediaPipe initialization is still in progress
+        if (window.mediaPipeInitializing) {
+            if (this.stats.framesCaptured % 30 === 0) {
+                console.log('⏳ Waiting for MediaPipe initialization...');
+            }
+            this.stats.framesCaptured++;
+            return;
+        }
+        
         try {
             const startTime = performance.now();
             
-            // V2: Skip MediaPipe processing (backend does it!)
-            // if (this.hands) {
-            //     this.hands.send({ image: this.video });
-            // }
-            
-            // Emit raw frame data to backend
-            this.emit('frame', this.video);
+            // V3: Send frame to MediaPipe for landmark extraction
+            if (this.hands) {
+                // Don't use mediaPipeBusy flag here - MediaPipe handles its own queue
+                // Just send the frame and let MediaPipe process it
+                this.hands.send({ image: this.video }).catch(err => {
+                    // Log error but don't crash - throttle error logging
+                    if (this.stats.framesCaptured % 60 === 0) {
+                        console.warn('MediaPipe send error:', err?.message || err);
+                    }
+                    // Emit no-hands to keep connection alive
+                    this.emit('landmarks', {
+                        landmarks: null,
+                        hasHands: false,
+                        handCount: 0
+                    });
+                });
+            } else {
+                // MediaPipe not ready - log every 60 frames (~4 seconds)
+                if (this.stats.framesCaptured % 60 === 0) {
+                    console.warn('MediaPipe not ready, skipping frame', this.stats.framesCaptured);
+                }
+                // Still emit no-hands to keep connection alive (throttled)
+                if (this.stats.framesCaptured % 15 === 0) {
+                    this.emit('landmarks', {
+                        landmarks: null,
+                        hasHands: false,
+                        handCount: 0
+                    });
+                }
+            }
             
             // Update stats
             this.stats.framesCaptured++;
@@ -333,6 +513,12 @@ class CameraManager {
             
             const frameTime = performance.now() - startTime;
             this.stats.avgFrameTime = (this.stats.avgFrameTime * 0.9) + (frameTime * 0.1);
+            
+            // Debug: Log frame rate every 5 seconds (75 frames at 15 FPS)
+            if (this.stats.framesCaptured % 75 === 0) {
+                const now = Date.now();
+                console.log(`[Camera] Frames: ${this.stats.framesCaptured}, processed: ${this.stats.framesProcessed}, hands: ${this.stats.handDetections}, loop alive: ${now}`);
+            }
             
         } catch (error) {
             console.error('Frame capture error:', error);
@@ -342,6 +528,9 @@ class CameraManager {
     
     handleMediaPipeResults(results) {
         try {
+            // Reset watchdog timer - MediaPipe is responding
+            this.lastMediaPipeResponse = Date.now();
+            
             // Clear canvas
             if (this.ctx) {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -351,16 +540,45 @@ class CameraManager {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0 && this.ctx) {
                 this.drawHandLandmarksImproved(results.multiHandLandmarks);
                 this.stats.handDetections++;
+                this.consecutiveNoHands = 0; // Reset counter
                 
                 // Show hand detection indicator
                 this.showHandDetectionIndicator(true);
+                
+                // V3: Convert landmarks to 189-feature array and emit
+                const landmarks189 = this.convertLandmarksTo189(results.multiHandLandmarks);
+                this.emit('landmarks', {
+                    landmarks: landmarks189,
+                    hasHands: true,
+                    handCount: results.multiHandLandmarks.length
+                });
+                
             } else {
                 // Show no hands detected
                 this.showHandDetectionIndicator(false);
+                this.consecutiveNoHands++;
+                
+                // THROTTLE "no hands" emissions to prevent flooding
+                const now = Date.now();
+                if (now - this.lastNoHandsEmit >= this.noHandsThrottleMs) {
+                    this.lastNoHandsEmit = now;
+                    
+                    // V3: Emit no-hands signal (throttled)
+                    this.emit('landmarks', {
+                        landmarks: null,
+                        hasHands: false,
+                        handCount: 0
+                    });
+                }
+                
+                // If no hands for too long (10+ seconds), reduce processing
+                if (this.consecutiveNoHands > 150) { // ~10 seconds at 15 FPS
+                    // Slow down to prevent CPU overload
+                    this.noHandsThrottleMs = 500; // Only emit every 500ms
+                } else {
+                    this.noHandsThrottleMs = 200; // Normal rate
+                }
             }
-            
-            // Emit processed results
-            this.emit('mediapipe_results', results);
             
             // Update stats
             this.stats.framesProcessed++;
@@ -368,6 +586,31 @@ class CameraManager {
         } catch (error) {
             console.error('MediaPipe results handling error:', error);
         }
+    }
+    
+    /**
+     * Convert MediaPipe landmarks to 189-feature array format.
+     * Format: [hand1_x0, hand1_y0, hand1_z0, ..., hand2_x0, hand2_y0, hand2_z0, ..., padding]
+     * Total: 21 landmarks × 3 coords × 2 hands = 126 features + 63 padding = 189
+     */
+    convertLandmarksTo189(multiHandLandmarks) {
+        // Initialize array with zeros (padding)
+        const features = new Array(189).fill(0);
+        
+        // Process up to 2 hands
+        for (let handIdx = 0; handIdx < Math.min(multiHandLandmarks.length, 2); handIdx++) {
+            const landmarks = multiHandLandmarks[handIdx];
+            const offset = handIdx * 63; // 21 landmarks × 3 coords = 63 per hand
+            
+            for (let i = 0; i < 21; i++) {
+                const landmark = landmarks[i];
+                features[offset + i * 3] = landmark.x;       // x (0-1 normalized)
+                features[offset + i * 3 + 1] = landmark.y;   // y (0-1 normalized)
+                features[offset + i * 3 + 2] = landmark.z;   // z (depth, relative)
+            }
+        }
+        
+        return features;
     }
     
     showHandDetectionIndicator(detected) {
@@ -632,10 +875,15 @@ class CameraManager {
     
     off(event, callback) {
         if (this.listeners.has(event)) {
-            const callbacks = this.listeners.get(event);
-            const index = callbacks.indexOf(callback);
-            if (index > -1) {
-                callbacks.splice(index, 1);
+            if (callback === undefined) {
+                // Clear all listeners for this event if no callback specified
+                this.listeners.set(event, []);
+            } else {
+                const callbacks = this.listeners.get(event);
+                const index = callbacks.indexOf(callback);
+                if (index > -1) {
+                    callbacks.splice(index, 1);
+                }
             }
         }
     }
@@ -671,6 +919,25 @@ class CameraManager {
             frameRate: this.frameRate,
             isActive: this.isActive
         };
+    }
+    
+    destroy() {
+        console.log('Destroying camera manager...');
+        
+        // Stop everything
+        this.stop();
+        
+        // Clear all event listeners
+        this.listeners.clear();
+        
+        // Clear references
+        this.video = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.frameCanvas = null;
+        this.frameCtx = null;
+        
+        console.log('Camera manager destroyed');
     }
 }
 

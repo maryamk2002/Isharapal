@@ -172,10 +172,21 @@ class UIManager {
         }
     }
     
-    updatePrediction(prediction, confidence, allPredictions, isStable = false) {
+    updatePrediction(prediction, confidence, allPredictions, isStable = false, isLowConfidence = false) {
         // Update prediction display with new structure
         if (this.elements.predictionDisplay) {
-            if (prediction) {
+            if (isLowConfidence) {
+                // Show "Searching..." state for low confidence predictions
+                this.elements.predictionDisplay.innerHTML = `
+                    <div class="prediction-placeholder searching">
+                        <div class="placeholder-icon">🔍</div>
+                        <div class="placeholder-text">
+                            <span class="urdu">تلاش جاری ہے...</span>
+                            <span class="english">Searching...</span>
+                        </div>
+                    </div>
+                `;
+            } else if (prediction) {
                 this.elements.predictionDisplay.innerHTML = `
                     <div class="sign-result">
                         <div class="sign-text">${prediction}</div>
@@ -222,6 +233,29 @@ class UIManager {
             if (this.elements.confidenceValue) {
                 this.elements.confidenceValue.textContent = '0%';
             }
+        }
+    }
+    
+    clearPrediction() {
+        // Clear prediction display to placeholder state
+        if (this.elements.predictionDisplay) {
+            this.elements.predictionDisplay.innerHTML = `
+                <div class="prediction-placeholder">
+                    <div class="placeholder-icon">👋</div>
+                    <div class="placeholder-text">
+                        <span class="urdu">اشارہ دکھائیں</span>
+                        <span class="english">Show a sign to begin</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Reset confidence bar
+        if (this.elements.confidenceFill) {
+            this.elements.confidenceFill.style.width = '0%';
+        }
+        if (this.elements.confidenceValue) {
+            this.elements.confidenceValue.textContent = '0%';
         }
     }
     
@@ -566,6 +600,24 @@ class UIManager {
     
     get connected() {
         return this.isConnected;
+    }
+    
+    destroy() {
+        // Clean up event listeners and references
+        console.log('Destroying UI Manager...');
+        
+        // Clear notifications
+        this.clearNotifications();
+        
+        // Reset state
+        this.isConnected = false;
+        this.isRecognitionActive = false;
+        
+        // Clear element references
+        this.elements = {};
+        this.notifications = [];
+        
+        console.log('UI Manager destroyed');
     }
 }
 

@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """
 Feedback System for PSL Recognition
-Stores user feedback to improve model accuracy over time
+Stores user feedback to improve model accuracy over time.
+
+Extended to support saving landmark sequences for retraining.
 """
 
 import sqlite3
 import logging
 import json
+import time
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -382,6 +386,120 @@ class FeedbackDatabase:
         except Exception as e:
             logger.error(f"Failed to export feedback: {e}")
             raise
+    
+    def save_feedback_sample(
+        self,
+        landmarks: np.ndarray,
+        correct_label: str,
+        predicted_label: str,
+        confidence: float,
+        session_id: Optional[str] = None,
+        feedback_logs_dir: Optional[Path] = None
+    ) -> Optional[Path]:
+        """
+        Save a landmark sequence as .npy file for retraining.
+        
+        This is called when user marks a prediction as "Incorrect" and provides
+        the correct label. The saved file can be merged into features_temporal/
+        for model retraining.
+        
+        Args:
+            landmarks: Numpy array of shape (N, 189) - the frame sequence
+            correct_label: The label the user said was correct
+            predicted_label: The model's (incorrect) prediction
+            confidence: The model's confidence for the incorrect prediction
+            session_id: Optional session identifier
+            feedback_logs_dir: Directory to save feedback logs (default: data/feedback_logs)
+            
+        Returns:
+            Path to the saved .npy file, or None if saving failed
+        """
+        try:
+            # Validate landmarks
+            if landmarks is None or len(landmarks) == 0:
+                logger.warning("Cannot save feedback sample: landmarks is empty")
+                return None
+            
+            if landmarks.ndim != 2 or landmarks.shape[1] != 189:
+                logger.warning(f"Invalid landmarks shape: {landmarks.shape}, expected (N, 189)")
+                return None
+            
+            # Use default feedback logs directory if not specified
+            if feedback_logs_dir is None:
+                # Import here to avoid circular imports
+                from config_v2 import FEEDBACK_LOGS_DIR
+                feedback_logs_dir = FEEDBACK_LOGS_DIR
+            
+            # Create label directory
+            label_dir = feedback_logs_dir / correct_label
+            label_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Generate timestamp-based filename
+            # Format: {label}_{timestamp}.npy
+            timestamp = int(time.time() * 1000)  # Milliseconds for uniqueness
+            filename = f"{correct_label}_{timestamp}.npy"
+            filepath = label_dir / filename
+            
+            # Save as numpy file (matching features_temporal format)
+            np.save(filepath, landmarks.astype(np.float64))
+            
+            logger.info(
+                f"Saved feedback sample: {filepath} "
+                f"(shape: {landmarks.shape}, predicted: {predicted_label}, correct: {correct_label})"
+            )
+            
+            # Also log to database for tracking
+            self.add_feedback(
+                predicted_label=predicted_label,
+                confidence=confidence,
+                is_correct=False,
+                session_id=session_id,
+                metadata={
+                    'correct_label': correct_label,
+                    'sample_file': str(filepath),
+                    'sample_shape': list(landmarks.shape),
+                    'type': 'correction_with_sample'
+                }
+            )
+            
+            return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to save feedback sample: {e}")
+            return None
+    
+    def get_feedback_sample_stats(self, feedback_logs_dir: Optional[Path] = None) -> Dict[str, Any]:
+        """
+        Get statistics about saved feedback samples.
+        
+        Returns:
+            Dictionary with counts per label and total samples
+        """
+        try:
+            if feedback_logs_dir is None:
+                from config_v2 import FEEDBACK_LOGS_DIR
+                feedback_logs_dir = FEEDBACK_LOGS_DIR
+            
+            if not feedback_logs_dir.exists():
+                return {'total_samples': 0, 'samples_per_label': {}}
+            
+            stats = {
+                'total_samples': 0,
+                'samples_per_label': {}
+            }
+            
+            for label_dir in feedback_logs_dir.iterdir():
+                if label_dir.is_dir():
+                    npy_files = list(label_dir.glob("*.npy"))
+                    count = len(npy_files)
+                    stats['samples_per_label'][label_dir.name] = count
+                    stats['total_samples'] += count
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Failed to get feedback sample stats: {e}")
+            return {'total_samples': 0, 'samples_per_label': {}, 'error': str(e)}
     
     def get_summary(self) -> Dict[str, Any]:
         """Get overall feedback summary."""

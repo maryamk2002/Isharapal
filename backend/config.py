@@ -65,9 +65,9 @@ class MediaPipeConfig:
     """MediaPipe hands detection configuration with validation."""
     
     MAX_NUM_HANDS: int = 2
-    MIN_DETECTION_CONFIDENCE: float = 0.3  # DEMO: Lower for better detection
-    MIN_TRACKING_CONFIDENCE: float = 0.3   # DEMO: Lower for better tracking
-    MODEL_COMPLEXITY: int = 0  # 0=fast, 1=balanced, 2=accurate
+    MIN_DETECTION_CONFIDENCE: float = 0.7  # HIGHER to avoid detecting arm/face as hands
+    MIN_TRACKING_CONFIDENCE: float = 0.6   # HIGHER for better tracking accuracy
+    MODEL_COMPLEXITY: int = 1  # 1=balanced (more accurate, still fast enough)
     STATIC_IMAGE_MODE: bool = False
     
     def __post_init__(self):
@@ -122,8 +122,8 @@ class InferenceConfig:
 class WebSocketConfig:
     """WebSocket communication configuration."""
     
-    PING_INTERVAL: int = 25  # seconds
-    PING_TIMEOUT: int = 60  # seconds
+    PING_INTERVAL: int = 10  # seconds (more frequent pings for stability)
+    PING_TIMEOUT: int = 120  # seconds (longer timeout to prevent disconnects)
     MAX_CONNECTIONS: int = 100
     CORS_ORIGINS: List[str] = field(default_factory=lambda: ["*"])
     MAX_MESSAGE_SIZE: int = 16 * 1024 * 1024  # 16MB

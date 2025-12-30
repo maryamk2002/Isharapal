@@ -287,16 +287,30 @@ def handle_connect():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Handle client disconnection."""
+    """
+    Handle client disconnection.
+    
+    Immediately kills inference loop and releases resources.
+    No graceful shutdown needed as we can't send data back anyway.
+    """
     global performance_stats
     
     performance_stats['active_connections'] -= 1
     
     session_id = request.sid
     if session_id in sessions:
-        # Clean up session predictor
-        if 'predictor' in sessions[session_id] and sessions[session_id]['predictor'] is not None:
-            sessions[session_id]['predictor'].clear_buffer()
+        # Immediately stop any processing (no waiting)
+        session_predictor = sessions[session_id].get('predictor')
+        if session_predictor is not None:
+            # Request stop to interrupt any loops
+            session_predictor.request_stop()
+            # Clear buffer immediately
+            session_predictor.clear_buffer()
+        
+        # End performance monitoring for this session
+        if global_performance_monitor:
+            global_performance_monitor.end_session(session_id)
+        
         del sessions[session_id]
     
     logger.info(f"Client disconnected: {session_id}")
@@ -338,6 +352,8 @@ def handle_start_recognition(data):
             stuck_threshold_frames=filtering_config.STUCK_THRESHOLD_FRAMES,
             stuck_movement_threshold=filtering_config.STUCK_MOVEMENT_THRESHOLD
         )
+    else:
+        sessions[session_id]['keypoint_filter'] = None
     
     # Initialize recording manager for this session
     if recording_config.AUTO_STOP_ENABLED:
@@ -347,11 +363,17 @@ def handle_start_recognition(data):
             auto_save=recording_config.AUTO_SAVE_SEGMENTS
         )
         sessions[session_id]['recording_manager'].start_session(session_id)
+    else:
+        sessions[session_id]['recording_manager'] = None
     
+    # RESET all session state variables
     sessions[session_id]['recognition_active'] = True
     sessions[session_id]['frames_processed'] = 0
     sessions[session_id]['predictions_sent'] = 0
     sessions[session_id]['last_activity'] = time.time()
+    sessions[session_id]['consecutive_no_hands'] = 0  # RESET
+    sessions[session_id]['last_landmarks'] = None  # RESET
+    sessions[session_id]['repeated_landmarks_count'] = 0  # RESET
     
     logger.info(f"Recognition started for session: {session_id}")
     emit('recognition_started', {'session_id': session_id})
@@ -359,18 +381,53 @@ def handle_start_recognition(data):
 
 @socketio.on('stop_recognition')
 def handle_stop_recognition(data):
-    """Handle stop recognition request."""
+    """
+    Handle stop recognition request.
+    
+    Implements graceful shutdown: waits for current inference to complete
+    before clearing the buffer. This ensures no data loss.
+    """
     session_id = request.sid
     
     if session_id not in sessions:
         emit('error', {'message': 'Session not found'})
         return
     
+    predictor = sessions[session_id].get('predictor')
+    
+    # Graceful shutdown: wait for current processing to complete
+    if predictor is not None:
+        # Request stop (sets flag for predictor to check)
+        predictor.request_stop()
+        
+        # Wait for any in-progress inference to complete (max 5 seconds)
+        from config_v2 import session_config
+        wait_timeout = session_config.MAX_GRACEFUL_SHUTDOWN_SEC
+        
+        if predictor.is_processing:
+            logger.info(f"Waiting for in-progress inference to complete (max {wait_timeout}s)...")
+            processing_completed = predictor.wait_for_processing(timeout_sec=wait_timeout)
+            
+            if not processing_completed:
+                logger.warning("Timeout waiting for processing, forcing stop")
+        
+        # Clear the stop request flag for potential restart
+        predictor.clear_stop_request()
+    
     sessions[session_id]['recognition_active'] = False
     
     # Clear predictor buffer
-    if sessions[session_id].get('predictor') is not None:
-        sessions[session_id]['predictor'].clear_buffer()
+    if predictor is not None:
+        predictor.clear_buffer()
+    
+    # Reset keypoint filter
+    if sessions[session_id].get('keypoint_filter') is not None:
+        sessions[session_id]['keypoint_filter'].reset()
+    
+    # Reset state variables for clean restart
+    sessions[session_id]['consecutive_no_hands'] = 0
+    sessions[session_id]['last_landmarks'] = None
+    sessions[session_id]['repeated_landmarks_count'] = 0
     
     logger.info(f"Recognition stopped for session: {session_id}")
     emit('recognition_stopped', {'session_id': session_id})
@@ -378,7 +435,7 @@ def handle_stop_recognition(data):
 
 @socketio.on('reset_recognition')
 def handle_reset_recognition(data):
-    """Handle reset recognition request - clears buffer."""
+    """Handle reset recognition request - clears buffer and all state."""
     session_id = request.sid
     
     if session_id not in sessions:
@@ -389,8 +446,16 @@ def handle_reset_recognition(data):
     if sessions[session_id].get('predictor') is not None:
         sessions[session_id]['predictor'].clear_buffer()
     
+    # Reset keypoint filter
+    if sessions[session_id].get('keypoint_filter') is not None:
+        sessions[session_id]['keypoint_filter'].reset()
+    
+    # RESET all session state variables
     sessions[session_id]['frames_processed'] = 0
     sessions[session_id]['predictions_sent'] = 0
+    sessions[session_id]['consecutive_no_hands'] = 0
+    sessions[session_id]['last_landmarks'] = None
+    sessions[session_id]['repeated_landmarks_count'] = 0
     
     logger.info(f"Recognition reset for session: {session_id}")
     emit('recognition_reset', {
@@ -415,11 +480,25 @@ def handle_update_settings(data):
     })
 
 
+@socketio.on('ping_keep_alive')
+def handle_ping_keep_alive(data):
+    """Handle keep-alive ping from frontend to prevent timeout."""
+    session_id = request.sid
+    
+    if session_id in sessions:
+        sessions[session_id]['last_activity'] = time.time()
+        # Respond with pong to confirm connection is alive
+        emit('pong_keep_alive', {'timestamp': time.time(), 'status': 'alive'})
+
+
 @socketio.on('feedback')
 def handle_feedback(data):
     """
     Handle user feedback on predictions.
     Stores feedback in SQLite database for analysis and retraining.
+    
+    For incorrect predictions with corrections, also saves the landmark
+    sequence as a .npy file for future model retraining.
     """
     global feedback_db
     
@@ -431,7 +510,7 @@ def handle_feedback(data):
     
     try:
         # Extract feedback data
-        label = data.get('label')
+        label = data.get('label')  # The predicted (possibly incorrect) label
         is_correct = data.get('is_correct')
         metadata = data.get('metadata', {})
         
@@ -442,8 +521,46 @@ def handle_feedback(data):
         # Get confidence from metadata
         confidence = metadata.get('confidence', 0.0)
         
-        # Store feedback
+        # Check if this is a correction with a correct label
+        correct_label = metadata.get('correct_label')
+        save_sample = metadata.get('save_sample', False)
+        sample_saved = False
+        sample_path = None
+        
+        # If correction feedback, save the landmark sequence for retraining
+        if not is_correct and correct_label and save_sample:
+            # Get the current landmarks from the session predictor
+            session_predictor = sessions[session_id].get('predictor')
+            if session_predictor and feedback_db:
+                landmarks = session_predictor.get_current_sequence()
+                if landmarks is not None and len(landmarks) > 0:
+                    # Save landmarks as .npy file
+                    sample_path = feedback_db.save_feedback_sample(
+                        landmarks=landmarks,
+                        correct_label=correct_label,
+                        predicted_label=label,
+                        confidence=confidence,
+                        session_id=session_id
+                    )
+                    sample_saved = sample_path is not None
+                    
+                    if sample_saved:
+                        logger.info(
+                            f"Correction sample saved: {correct_label} "
+                            f"(predicted: {label}, shape: {landmarks.shape})"
+                        )
+                    else:
+                        logger.warning("Failed to save correction sample")
+                else:
+                    logger.warning("No landmarks available to save for correction")
+        
+        # Store feedback in database
         if feedback_db:
+            # Add sample info to metadata if saved
+            if sample_saved:
+                metadata['sample_saved'] = True
+                metadata['sample_path'] = str(sample_path)
+            
             feedback_id = feedback_db.add_feedback(
                 predicted_label=label,
                 confidence=confidence,
@@ -456,17 +573,25 @@ def handle_feedback(data):
                 f"Feedback received - Session: {session_id}, "
                 f"Label: {label}, Correct: {is_correct}, "
                 f"Confidence: {confidence:.3f}"
+                f"{f', Correction: {correct_label}' if correct_label else ''}"
             )
             
             # Record feedback in performance monitor for accuracy tracking
             if global_performance_monitor:
                 global_performance_monitor.record_feedback(label, is_correct)
             
-            emit('feedback_received', {
+            # Prepare response
+            response = {
                 'feedback_id': feedback_id,
                 'status': 'success',
                 'message': 'Thank you for your feedback!'
-            })
+            }
+            
+            if sample_saved:
+                response['sample_saved'] = True
+                response['message'] = f'Correction saved! Sample stored for retraining.'
+            
+            emit('feedback_received', response)
         else:
             logger.warning("Feedback database not initialized")
             emit('feedback_received', {
@@ -548,26 +673,46 @@ def handle_frame_data(data):
         # If no hands detected
         if keypoints_189 is None:
             sessions[session_id]['consecutive_no_hands'] += 1
+            no_hands_count = sessions[session_id]['consecutive_no_hands']
             
-            # TOLERANCE - only clear buffer after 2 consecutive no-hand frames
-            if sessions[session_id]['consecutive_no_hands'] >= 2:
-                session_predictor.add_frame(None)
+            # Log every 15 frames (~1 second) of no hands for debugging
+            if no_hands_count % 15 == 0:
+                logger.debug(f"No hands detected for {no_hands_count} frames ({no_hands_count / 15:.1f}s)")
+            
+            # TOLERANCE - allow 22 consecutive no-hand frames (~1.5 seconds at 15 FPS)
+            # before clearing the buffer. This prevents losing predictions when
+            # hand briefly goes out of frame.
+            if no_hands_count >= 22:
+                # Clear buffer after 1.5 seconds of no hands
+                try:
+                    session_predictor.add_frame(None)
+                except Exception as e:
+                    logger.error(f"Error clearing predictor buffer: {e}")
+                    
                 sessions[session_id]['last_landmarks'] = None
                 sessions[session_id]['repeated_landmarks_count'] = 0
+                
                 if keypoint_filter:
-                    keypoint_filter.reset()
+                    try:
+                        keypoint_filter.reset()
+                    except Exception as e:
+                        logger.error(f"Error resetting keypoint filter: {e}")
+                
+                # Update recording manager (no hands) - wrapped in try/except
+                if recording_manager:
+                    try:
+                        segment = recording_manager.on_no_hands(current_timestamp)
+                        if segment:
+                            response['recording_segment'] = segment
+                            response['recording_status'] = 'stopped'
+                            logger.info(f"Recording segment completed: {segment['label']} ({segment['duration']:.1f}s)")
+                    except Exception as e:
+                        logger.error(f"Error in recording manager: {e}")
             
-            # Update recording manager (no hands)
-            if recording_manager:
-                segment = recording_manager.on_no_hands(current_timestamp)
-                if segment:
-                    response['recording_segment'] = segment
-                    response['recording_status'] = 'stopped'
-                    logger.info(f"Recording segment completed: {segment['label']} ({segment['duration']:.1f}s)")
-            
+            # Always emit response for no_hands - never block
             response['status'] = 'no_hands'
             response['prediction'] = None
-            response['keypoints'] = sessions[session_id].get('last_landmarks')  # Keep showing last landmarks
+            response['keypoints'] = sessions[session_id].get('last_landmarks')
             emit('frame_processed', response)
             return
         
@@ -598,16 +743,15 @@ def handle_frame_data(data):
             if filtered is not None:
                 filtered_keypoints = filtered
         
-        # Detect frozen/repeated frames (legacy check - kept for compatibility)
+        # Detect frozen/repeated frames (just log, don't block processing)
         if sessions[session_id]['last_landmarks'] is not None:
             last_lm = np.array(sessions[session_id]['last_landmarks'])
-            if np.allclose(filtered_keypoints[:63], last_lm[:63], atol=0.001):
+            # Use a more relaxed tolerance (0.005 instead of 0.001)
+            if np.allclose(filtered_keypoints[:63], last_lm[:63], atol=0.005):
                 sessions[session_id]['repeated_landmarks_count'] += 1
-                if sessions[session_id]['repeated_landmarks_count'] > 10:
-                    # Skip frozen frame
-                    response['status'] = 'frozen_frame'
-                    emit('frame_processed', response)
-                    return
+                # Only log after many repeated frames (30+), don't block processing
+                if sessions[session_id]['repeated_landmarks_count'] > 30:
+                    logger.debug(f"Many similar frames detected ({sessions[session_id]['repeated_landmarks_count']})")
             else:
                 sessions[session_id]['repeated_landmarks_count'] = 0
         
@@ -637,13 +781,23 @@ def handle_frame_data(data):
             if global_performance_monitor:
                 global_performance_monitor.record_inference_time(prediction_time_ms)
             
-            response['status'] = 'success'
             response['buffer_size'] = prediction_result['buffer_size']
             response['prediction_time_ms'] = prediction_result['prediction_time_ms']
             
+            # Check for low confidence state first
+            if prediction_result.get('is_low_confidence'):
+                response['status'] = 'low_confidence'
+                response['prediction'] = None
+                # Include top predictions for debugging
+                all_preds = prediction_result.get('all_predictions', [])
+                if all_preds:
+                    response['top_predictions'] = all_preds[:3]
+                logger.debug(f"Low confidence prediction: {prediction_result.get('confidence', 0):.3f}")
+            
             # Send prediction data
             # Only send stable predictions to avoid flickering
-            if prediction_result.get('is_stable'):
+            elif prediction_result.get('is_stable'):
+                response['status'] = 'success'
                 label = prediction_result['stable_prediction']
                 confidence = prediction_result['stable_confidence']
                 is_new = prediction_result['is_new']
@@ -698,13 +852,15 @@ def handle_frame_data(data):
                         response['recording_segment'] = segment
                         response['recording_status'] = 'stopped'
             
-            # Optionally include all predictions (for debugging/visualization)
-            if data.get('include_all_predictions', False):
-                response['all_predictions'] = prediction_result.get('all_predictions', [])
+                # Always include top 3 predictions for debugging
+                all_preds = prediction_result.get('all_predictions', [])
+                if all_preds:
+                    response['top_predictions'] = all_preds[:3]
+                
+                # Optionally include all predictions (for debugging/visualization)
+                if data.get('include_all_predictions', False):
+                    response['all_predictions'] = all_preds
         
-        elif prediction_result is None and should_predict is False:
-            # State machine is controlling flow - use its status
-            response['status'] = response.get('state', 'collecting_frames')
         else:
             # Still collecting frames
             response['status'] = 'collecting_frames'
@@ -729,6 +885,247 @@ def handle_frame_data(data):
         
     except Exception as e:
         logger.error(f"Error processing frame: {e}")
+        performance_stats['failed_predictions'] += 1
+        emit('frame_processed', {
+            'session_id': session_id,
+            'status': 'error',
+            'error': str(e)
+        })
+
+
+@socketio.on('landmark_data')
+def handle_landmark_data(data):
+    """
+    V3: Handle pre-extracted landmarks from frontend MediaPipe.
+    
+    This is 98% more efficient than sending images:
+    - Receives ~2KB JSON instead of ~150KB Base64 image
+    - Skips Base64 decode + MediaPipe processing on backend
+    - Backend only runs TCN inference
+    """
+    global performance_stats
+    
+    session_id = request.sid
+    
+    # Check if session still exists
+    if session_id not in sessions:
+        logger.warning(f"Landmarks received for non-existent session: {session_id}")
+        return
+    
+    if not sessions[session_id].get('recognition_active', False):
+        return
+
+    if predictor is None:
+        emit('frame_processed', {
+            'session_id': session_id,
+            'status': 'system_not_ready'
+        })
+        return
+    
+    # Get session predictor
+    session_predictor = sessions[session_id].get('predictor')
+    if session_predictor is None:
+        emit('frame_processed', {
+            'session_id': session_id,
+            'status': 'predictor_not_initialized'
+        })
+        return
+    
+    try:
+        start_time = time.time()
+        current_timestamp = time.time()
+        
+        # Record frame processed (for FPS calculation)
+        if global_performance_monitor:
+            global_performance_monitor.record_frame_processed()
+        
+        # Get landmarks from frontend (already in 189-feature format)
+        landmarks_list = data.get('landmarks')
+        has_hands = data.get('has_hands', False)
+        
+        # Get session components
+        keypoint_filter = sessions[session_id].get('keypoint_filter')
+        recording_manager = sessions[session_id].get('recording_manager')
+        
+        # Prepare response
+        response = {
+            'session_id': session_id,
+            'timestamp': current_timestamp,
+        }
+        
+        # Convert landmarks to numpy array
+        if landmarks_list is not None and has_hands:
+            keypoints_189 = np.array(landmarks_list, dtype=np.float32)
+            
+            # Send keypoints for visualization (first 126 = actual landmarks, not padding)
+            if inference_config.SEND_KEYPOINTS_TO_FRONTEND:
+                response['keypoints'] = keypoints_189[:126].tolist()
+            
+            # Record landmarks extracted
+            if global_performance_monitor:
+                global_performance_monitor.record_landmarks_extracted()
+        else:
+            keypoints_189 = None
+            response['keypoints'] = None
+        
+        # If no hands detected
+        if keypoints_189 is None:
+            sessions[session_id]['consecutive_no_hands'] += 1
+            no_hands_count = sessions[session_id]['consecutive_no_hands']
+            
+            # TOLERANCE - allow 22 consecutive no-hand frames (~1.5s at 15 FPS)
+            if no_hands_count >= 22:
+                try:
+                    session_predictor.add_frame(None)
+                except Exception as e:
+                    logger.error(f"Error clearing predictor buffer: {e}")
+                    
+                sessions[session_id]['last_landmarks'] = None
+                
+                if keypoint_filter:
+                    try:
+                        keypoint_filter.reset()
+                    except Exception as e:
+                        logger.error(f"Error resetting keypoint filter: {e}")
+                
+                # Update recording manager (no hands)
+                if recording_manager:
+                    try:
+                        segment = recording_manager.on_no_hands(current_timestamp)
+                        if segment:
+                            response['recording_segment'] = segment
+                            response['recording_status'] = 'stopped'
+                    except Exception as e:
+                        logger.error(f"Error in recording manager: {e}")
+            
+            response['status'] = 'no_hands'
+            response['prediction'] = None
+            emit('frame_processed', response)
+            return
+        
+        # Reset no-hands counter
+        sessions[session_id]['consecutive_no_hands'] = 0
+        
+        # Apply keypoint filtering (if enabled)
+        filtered_keypoints = keypoints_189
+        if keypoint_filter:
+            keypoint_filter.add_keypoint(keypoints_189)
+            filtered = keypoint_filter.get_filtered()
+            
+            # Check for stuck sequence
+            if keypoint_filter.is_stuck():
+                logger.warning(f"Stuck sequence detected for session {session_id}, resetting buffer")
+                session_predictor.clear_buffer()
+                keypoint_filter.reset()
+                response['status'] = 'stuck_sequence_reset'
+                response['message'] = 'Please move your hand'
+                emit('frame_processed', response)
+                return
+            
+            if filtered is not None:
+                filtered_keypoints = filtered
+        
+        # Add to predictor buffer
+        session_predictor.add_frame(filtered_keypoints)
+        
+        # Store last landmarks for reference
+        sessions[session_id]['last_landmarks'] = filtered_keypoints
+        sessions[session_id]['frames_processed'] += 1
+        
+        # Log every 60 frames to confirm we're still receiving data
+        frames_processed = sessions[session_id]['frames_processed']
+        if frames_processed % 60 == 0:  # Every 4 seconds at 15 FPS
+            logger.info(f"[DIAG] Session: {frames_processed} frames received")
+        
+        # Make prediction
+        prediction_result = session_predictor.predict_current()
+        
+        if prediction_result and prediction_result.get('ready', False):
+            prediction_time_ms = prediction_result.get('prediction_time_ms', 0)
+            
+            # Record inference time
+            if global_performance_monitor:
+                global_performance_monitor.record_inference_time(prediction_time_ms)
+            
+            response['buffer_size'] = prediction_result['buffer_size']
+            response['prediction_time_ms'] = prediction_time_ms
+            
+            # Check for low confidence state
+            if prediction_result.get('is_low_confidence'):
+                response['status'] = 'low_confidence'
+                response['prediction'] = None
+                all_preds = prediction_result.get('all_predictions', [])
+                if all_preds:
+                    response['top_predictions'] = all_preds[:3]
+                    # Log low confidence predictions (every few frames)
+                    frames_processed = sessions[session_id].get('frames_processed', 0)
+                    if frames_processed % 30 == 0:  # Log every 30 frames (2 seconds)
+                        top_3 = ", ".join([f"{p['label']}:{p['confidence']:.2f}" for p in all_preds[:3]])
+                        logger.info(f"[DIAG] Low confidence: {top_3}")
+            
+            # Send stable predictions
+            elif prediction_result.get('is_stable'):
+                response['status'] = 'success'
+                label = prediction_result['stable_prediction']
+                confidence = prediction_result['stable_confidence']
+                is_new = prediction_result['is_new']
+                
+                response['prediction'] = {
+                    'label': label,
+                    'confidence': confidence,
+                    'is_new': is_new,
+                    'is_stable': True
+                }
+                
+                if global_performance_monitor:
+                    global_performance_monitor.record_prediction(label)
+                
+                # Update recording manager
+                if recording_manager:
+                    segment = recording_manager.on_prediction(label, confidence, current_timestamp)
+                    if segment:
+                        response['recording_segment'] = segment
+                        response['recording_status'] = 'stopped'
+                    else:
+                        response['recording_status'] = recording_manager.get_recording_status()
+                
+                if is_new:
+                    sessions[session_id]['predictions_sent'] += 1
+                    logger.info(f"Session {session_id}: NEW prediction: {label} ({confidence:.3f})")
+            else:
+                # Not stable yet - collecting stability votes
+                response['status'] = 'collecting_stability'
+                response['prediction'] = None
+                all_preds = prediction_result.get('all_predictions', [])
+                if all_preds:
+                    response['top_predictions'] = all_preds[:3]
+                    frames_processed = sessions[session_id].get('frames_processed', 0)
+                    if frames_processed % 15 == 0:
+                        top_3 = ", ".join([f"{p['label']}:{p['confidence']:.2f}" for p in all_preds[:3]])
+                        logger.info(f"[DIAG] Collecting stability: {top_3}")
+        else:
+            # Still collecting frames (not enough yet)
+            response['status'] = 'collecting_frames'
+            response['buffer_size'] = prediction_result.get('buffer_size', 0) if prediction_result else 0
+            response['min_required'] = prediction_result.get('min_required', 20) if prediction_result else 20
+            response['prediction'] = None
+        
+        # Add performance metrics
+        if global_performance_monitor:
+            metrics = global_performance_monitor.get_metrics_summary()
+            response['performance'] = {
+                'fps': metrics['fps'],
+                'avg_inference_ms': metrics['avg_inference_ms'],
+                'landmark_detection_rate': metrics['landmark_detection_rate']
+            }
+            
+            if global_performance_monitor.should_auto_save():
+                global_performance_monitor.save_metrics()
+        
+        emit('frame_processed', response)
+        
+    except Exception as e:
+        logger.error(f"Error processing landmarks: {e}")
         performance_stats['failed_predictions'] += 1
         emit('frame_processed', {
             'session_id': session_id,
@@ -949,9 +1346,9 @@ if __name__ == '__main__':
     print("\n" + "=" * 70)
     print("IMPROVEMENTS IN V2:")
     print("-" * 70)
-    print("  • Faster response: 32-frame buffer (was 60)")
-    print("  • No lagging: predictions start immediately after 32 frames")
-    print("  • No flickering: improved stability filtering (3/5 votes)")
+    print(f"  • Faster response: {inference_config_v2.SLIDING_WINDOW_SIZE}-frame sliding window")
+    print(f"  • No lagging: predictions start after {inference_config_v2.MIN_FRAMES_FOR_PREDICTION} frames")
+    print(f"  • No flickering: improved stability filtering ({inference_config_v2.STABILITY_THRESHOLD}/{inference_config_v2.STABILITY_VOTES} votes)")
     print("  • No old predictions: auto-clear buffer when hands disappear")
     print("  • Synchronized keypoints: sent with predictions")
     print("=" * 70)
