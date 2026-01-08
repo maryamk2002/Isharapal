@@ -4,13 +4,20 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&display=swap');
 
-/* Urdu typography classes */
+/* Urdu typography classes - POLISH: Improved kerning and rendering */
 .urdu {
     font-family: 'Noto Sans Arabic', 'Amiri', 'Times New Roman', serif;
     font-weight: 400;
     line-height: 1.6;
     direction: rtl;
     text-align: right;
+    /* POLISH: Better kerning and text rendering */
+    font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Fix for RTL word spacing */
+    word-spacing: 0.05em;
 }
 
 .urdu-bold {

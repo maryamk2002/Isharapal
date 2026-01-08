@@ -216,35 +216,50 @@ class UIManager {
                             <span class="english">Searching...</span>
                         </span>
                     `;
+                    // Remove detected class
+                    this.elements.predictionResult.classList.remove('sign-detected');
                 } else if (prediction) {
+                    // POLISH: Check if this is a new prediction for animation
+                    const isNewPrediction = this._lastPrediction !== prediction;
+                    this._lastPrediction = prediction;
+                    
                     this.elements.predictionResult.innerHTML = `
-                        <span class="prediction">${prediction}</span>
+                        <span class="sign-text ${isNewPrediction ? 'sign-new' : ''}">${prediction}</span>
                     `;
                     
-                    // Add flash effect for new predictions (wrapped in try-catch for classList safety)
-                    try {
-                        this.elements.predictionResult.classList.add('flash');
-                        setTimeout(() => {
-                            try {
-                                if (this.elements.predictionResult) {
-                                    this.elements.predictionResult.classList.remove('flash');
+                    // POLISH: Add visual pulse effect for new detections
+                    if (isNewPrediction) {
+                        try {
+                            this.elements.predictionResult.classList.add('sign-detected');
+                            setTimeout(() => {
+                                try {
+                                    if (this.elements.predictionResult) {
+                                        this.elements.predictionResult.classList.remove('sign-detected');
+                                        // Also remove animation class after it completes
+                                        const signText = this.elements.predictionResult.querySelector('.sign-text');
+                                        if (signText) {
+                                            signText.classList.remove('sign-new');
+                                        }
+                                    }
+                                } catch (e) {
+                                    // Element may have been removed during timeout
                                 }
-                            } catch (e) {
-                                // Element may have been removed during timeout
-                            }
-                        }, 300);
-                    } catch (e) {
-                        console.debug('[UIManager] Flash effect failed:', e);
+                            }, 400);
+                        } catch (e) {
+                            console.debug('[UIManager] Animation effect failed:', e);
+                        }
                     }
                     
-                    // Increment sign count
-                    this.stats.signCount++;
-                    if (this.elements.signCountValue) {
-                        this.elements.signCountValue.textContent = this.stats.signCount;
+                    // Increment sign count only for new predictions
+                    if (isNewPrediction) {
+                        this.stats.signCount++;
+                        if (this.elements.signCountValue) {
+                            this.elements.signCountValue.textContent = this.stats.signCount;
+                        }
+                        
+                        // Add to history
+                        this.addToHistory(prediction, confidence);
                     }
-                    
-                    // Add to history
-                    this.addToHistory(prediction, confidence);
                     
                 } else {
                     this.elements.predictionResult.innerHTML = `
@@ -253,6 +268,8 @@ class UIManager {
                             <span class="english">Make a sign</span>
                         </span>
                     `;
+                    // Reset last prediction when cleared
+                    this._lastPrediction = null;
                 }
             }
             

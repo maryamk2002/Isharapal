@@ -684,20 +684,48 @@ body {
     font-weight: 800;
     text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     letter-spacing: 0.05em;
-    /* SMOOTH TRANSITION: Fade-in animation for new predictions */
-    animation: signFadeIn 0.3s ease-out;
+    /* POLISH: GPU-accelerated smooth transitions */
+    will-change: transform, opacity;
+    transform: translateZ(0); /* Force GPU layer */
+}
+
+/* POLISH: Separate class for new prediction animation (toggled by JS) */
+.sign-text.sign-new {
+    animation: signFadeIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes signFadeIn {
     0% {
         opacity: 0;
-        transform: scale(0.85) translateY(8px);
-        filter: blur(3px);
+        transform: scale(0.8) translateY(10px) translateZ(0);
+        filter: blur(4px);
+    }
+    60% {
+        opacity: 1;
+        transform: scale(1.05) translateY(-2px) translateZ(0);
+        filter: blur(0);
     }
     100% {
         opacity: 1;
-        transform: scale(1) translateY(0);
+        transform: scale(1) translateY(0) translateZ(0);
         filter: blur(0);
+    }
+}
+
+/* POLISH: Haptic-like visual feedback on recognition */
+.prediction-display.sign-detected {
+    animation: signDetectedPulse 0.4s ease-out;
+}
+
+@keyframes signDetectedPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 0 12px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: none;
     }
 }
 
@@ -762,9 +790,22 @@ body {
     border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
-/* Ensure feedback section is visible when not hidden by JS */
-.feedback-section:not([style*="display: none"]) {
-    display: block !important;
+/* Feedback section visibility - controlled by JS, remove conflicting rule */
+/* FIXED: Removed !important override that caused visibility bugs */
+.feedback-section {
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.feedback-section[data-visible="true"] {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.feedback-section[data-visible="false"] {
+    opacity: 0;
+    transform: translateY(-8px);
+    pointer-events: none;
 }
 
 .feedback-header {
@@ -1313,10 +1354,120 @@ body {
     
     .btn {
         width: 100%;
+        min-height: 48px; /* WCAG 2.1 AA tap target minimum */
     }
     
     .sign-text {
         font-size: 3rem;
+    }
+    
+    /* FIXED: Ensure all interactive elements meet 48px tap target */
+    .feedback-btn {
+        min-height: 56px; /* Larger for primary actions */
+        font-size: 1rem;
+    }
+}
+
+/* ========================================
+   IPHONE SE / SMALL SCREENS (320px)
+   ======================================== */
+@media (max-width: 375px) {
+    .container {
+        padding: 0 0.75rem;
+    }
+    
+    .header {
+        padding: 0.5rem 0;
+    }
+    
+    .logo-icon {
+        font-size: 1.75rem;
+    }
+    
+    .title-main {
+        font-size: 1.1rem;
+    }
+    
+    .title-sub {
+        font-size: 0.75rem;
+    }
+    
+    .card-title-simple {
+        font-size: 0.9rem;
+    }
+    
+    .video-container {
+        padding: 0.75rem;
+    }
+    
+    .control-panel {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+    
+    .btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .btn-icon {
+        font-size: 1rem;
+    }
+    
+    .btn-text .english {
+        font-size: 0.65rem;
+    }
+    
+    .prediction-display {
+        min-height: 100px;
+        padding: 1rem;
+    }
+    
+    .sign-text {
+        font-size: 2.5rem;
+    }
+    
+    .feedback-section {
+        padding: 0.75rem;
+    }
+    
+    .feedback-buttons {
+        gap: 0.5rem;
+    }
+    
+    .feedback-btn {
+        min-height: 48px;
+        padding: 0.5rem;
+    }
+    
+    .feedback-icon {
+        font-size: 1.25rem;
+    }
+    
+    .feedback-text .urdu {
+        font-size: 0.9rem;
+    }
+    
+    .feedback-text .english {
+        font-size: 0.65rem;
+    }
+    
+    .stats-bar {
+        padding: 0.5rem;
+    }
+    
+    .stat-item {
+        font-size: 0.75rem;
+    }
+    
+    .history-content-compact {
+        padding: 0.5rem;
+        max-height: 150px;
+    }
+    
+    /* Glassmorphism readability fix - stronger contrast on small screens */
+    .prediction-display {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%) !important;
     }
 }
 

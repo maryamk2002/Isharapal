@@ -54,8 +54,8 @@
     background: var(--card-bg, #ffffff);
     border-radius: 16px 0 0 16px;
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
-    z-index: 1100; /* Increased from 1000 to avoid header conflict */
-    transition: right 0.3s ease;
+    z-index: 1050; /* FIXED: Below feedback buttons (feedback-section visible in main content) but above header */
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -225,11 +225,31 @@
 
 .chart-empty {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
     color: var(--text-secondary, #9ca3af);
     font-size: 0.875rem;
+    gap: 8px;
+}
+
+.chart-empty::before {
+    content: '📊';
+    font-size: 1.5rem;
+    opacity: 0.5;
+}
+
+/* Empty state animations - subtle pulse to indicate waiting */
+.chart-empty,
+.confusion-empty,
+.history-empty {
+    animation: emptyStatePulse 2s ease-in-out infinite;
+}
+
+@keyframes emptyStatePulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 0.9; }
 }
 
 .chart-bars {
@@ -285,6 +305,14 @@
     color: var(--text-secondary, #9ca3af);
     font-size: 0.875rem;
     padding: 1rem;
+}
+
+.confusion-empty::before {
+    content: '✓';
+    display: block;
+    font-size: 1.25rem;
+    color: #10b981;
+    margin-bottom: 4px;
 }
 
 .confusion-item {

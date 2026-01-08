@@ -1111,18 +1111,60 @@ class PSLRecognitionApp {
     }
     
     /**
-     * Start the prediction loop (runs at ~12Hz for faster response)
+     * Start the prediction loop (OPTIMIZED: adaptive rate based on buffer state)
+     * PERFORMANCE FIX: Reduced frequency and smart skipping to eliminate lag
      */
     startPredictionLoop() {
         this.stopPredictionLoop();  // Clear any existing
         
-        // OPTIMIZED: Faster prediction rate (12Hz instead of 10Hz)
-        const predictionInterval = 83;  // ~12 predictions per second (was 100ms)
+        // PERFORMANCE FIX: Track last buffer size to skip redundant predictions
+        this._lastBufferSize = 0;
+        this._lastPredictionTime = 0;
+        this._consecutiveSkips = 0;
         
-        this.predictionLoopInterval = setInterval(async () => {
+        // Use requestAnimationFrame for smoother, non-blocking execution
+        const runPredictionCycle = async () => {
             if (!this.isRecognitionActive) {
                 return;
             }
+            
+            const now = performance.now();
+            
+            // PERFORMANCE FIX: Adaptive interval - slower when collecting, faster when ready
+            const bufferSize = this.predictor?.frameBuffer?.length || 0;
+            const minFrames = this.predictor?.config?.minPredictionFrames || 12;
+            
+            // Calculate adaptive interval:
+            // - 150ms when buffer is < 50% full (collecting frames)
+            // - 100ms when buffer is 50-80% full (almost ready)
+            // - 83ms when buffer is ready (fast predictions)
+            let targetInterval = 150;
+            if (bufferSize >= minFrames) {
+                targetInterval = 83;  // Ready for predictions
+            } else if (bufferSize >= minFrames * 0.5) {
+                targetInterval = 100; // Getting close
+            }
+            
+            // PERFORMANCE FIX: Skip if not enough time has passed
+            if (now - this._lastPredictionTime < targetInterval) {
+                this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+                return;
+            }
+            
+            // PERFORMANCE FIX: Skip prediction if buffer hasn't changed (no new frames)
+            if (bufferSize === this._lastBufferSize && bufferSize < minFrames) {
+                this._consecutiveSkips++;
+                // Only update UI occasionally when skipping
+                if (this._consecutiveSkips % 5 === 0) {
+                    this.updateBufferStatus(bufferSize, this.predictor.config.slidingWindowSize);
+                }
+                this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+                return;
+            }
+            
+            this._lastBufferSize = bufferSize;
+            this._lastPredictionTime = now;
+            this._consecutiveSkips = 0;
             
             try {
                 const startTime = performance.now();
@@ -1139,9 +1181,14 @@ class PSLRecognitionApp {
                 console.error('Prediction loop error:', error);
             }
             
-        }, predictionInterval);
+            // Schedule next cycle
+            this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+        };
         
-        console.log('Prediction loop started at 12Hz');
+        // Start the loop
+        this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+        
+        console.log('[PERF] Prediction loop started with adaptive rate (83-150ms)');
     }
     
     /**
@@ -1149,9 +1196,13 @@ class PSLRecognitionApp {
      */
     stopPredictionLoop() {
         if (this.predictionLoopInterval) {
-            clearInterval(this.predictionLoopInterval);
+            cancelAnimationFrame(this.predictionLoopInterval);
             this.predictionLoopInterval = null;
         }
+        // Reset tracking variables
+        this._lastBufferSize = 0;
+        this._lastPredictionTime = 0;
+        this._consecutiveSkips = 0;
     }
     
     /**
