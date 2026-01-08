@@ -113,6 +113,7 @@ class PracticeMode {
             panel: document.getElementById('practicePanel'),
             toggleBtn: document.getElementById('practiceToggle'),
             closeBtn: document.getElementById('practiceClose'),
+            header: document.querySelector('.practice-header'),
             
             // Reference display
             referenceImage: document.getElementById('practiceReferenceImage'),
@@ -132,6 +133,94 @@ class PracticeMode {
             nextBtn: document.getElementById('practiceNext'),
             weakSignsBtn: document.getElementById('practiceWeakSigns'),
             randomBtn: document.getElementById('practiceRandom')
+        };
+        
+        // Make panel draggable
+        this.initDraggable();
+    }
+    
+    /**
+     * Initialize draggable functionality for the practice panel
+     */
+    initDraggable() {
+        if (!this.elements.panel || !this.elements.header) return;
+        
+        let isDragging = false;
+        let startX, startY;
+        let panelX = 0, panelY = 0;
+        
+        // Add cursor style to header
+        this.elements.header.style.cursor = 'move';
+        
+        const onDragStart = (e) => {
+            // Only drag from header, not buttons
+            if (e.target.closest('button')) return;
+            
+            isDragging = true;
+            const rect = this.elements.panel.getBoundingClientRect();
+            
+            // Get current position
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            startX = clientX - rect.left - rect.width / 2;
+            startY = clientY - rect.top - rect.height / 2;
+            
+            this.elements.panel.style.transition = 'none';
+            e.preventDefault();
+        };
+        
+        const onDragMove = (e) => {
+            if (!isDragging) return;
+            
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            panelX = clientX - startX - window.innerWidth / 2;
+            panelY = clientY - startY - window.innerHeight / 2;
+            
+            // Keep panel within viewport bounds
+            const maxX = window.innerWidth / 2 - 100;
+            const maxY = window.innerHeight / 2 - 50;
+            panelX = Math.max(-maxX, Math.min(maxX, panelX));
+            panelY = Math.max(-maxY, Math.min(maxY, panelY));
+            
+            this.elements.panel.style.transform = `translate(calc(-50% + ${panelX}px), calc(-50% + ${panelY}px)) scale(1)`;
+        };
+        
+        const onDragEnd = () => {
+            if (!isDragging) return;
+            isDragging = false;
+            this.elements.panel.style.transition = '';
+        };
+        
+        // Mouse events
+        this.elements.header.addEventListener('mousedown', onDragStart);
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+        
+        // Touch events
+        this.elements.header.addEventListener('touchstart', onDragStart, { passive: false });
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+        
+        // Store cleanup function
+        this._cleanupDraggable = () => {
+            this.elements.header?.removeEventListener('mousedown', onDragStart);
+            document.removeEventListener('mousemove', onDragMove);
+            document.removeEventListener('mouseup', onDragEnd);
+            this.elements.header?.removeEventListener('touchstart', onDragStart);
+            document.removeEventListener('touchmove', onDragMove);
+            document.removeEventListener('touchend', onDragEnd);
+        };
+        
+        // Reset position function
+        this.resetPanelPosition = () => {
+            panelX = 0;
+            panelY = 0;
+            if (this.elements.panel) {
+                this.elements.panel.style.transform = 'translate(-50%, -50%) scale(1)';
+            }
         };
     }
     
@@ -162,6 +251,11 @@ class PracticeMode {
         
         if (this.elements.panel) {
             this.elements.panel.classList.remove('visible');
+        }
+        
+        // Reset panel position to center for next time
+        if (this.resetPanelPosition) {
+            this.resetPanelPosition();
         }
         
         // Save progress
@@ -545,6 +639,11 @@ class PracticeMode {
     destroy() {
         this.stop();
         this.savePracticeHistory();
+        
+        // Clean up draggable listeners
+        if (this._cleanupDraggable) {
+            this._cleanupDraggable();
+        }
     }
 }
 
