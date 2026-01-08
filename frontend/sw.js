@@ -7,8 +7,8 @@
  * - HTML, CSS, JS files
  */
 
-const CACHE_NAME = 'isharapal-v5';
-const CACHE_VERSION = '5.0.0';  // UPDATED: Performance optimizations + sign images cache
+const CACHE_NAME = 'isharapal-v6';
+const CACHE_VERSION = '6.0.0';  // UPDATED: Mobile enhancements + logo caching
 
 // Files to cache for offline use
 const STATIC_CACHE = [
@@ -28,15 +28,16 @@ const STATIC_CACHE = [
     './js/cloud_sync.js',
     './js/analytics.js',
     './js/practice-mode.js',
-    './js/disambiguation.js',      // ADDED: Missing innovation module
-    './js/word-shortcuts.js',      // ADDED: Missing innovation module
-    './js/pip-mode.js',            // ADDED: Missing innovation module
+    './js/disambiguation.js',
+    './js/word-shortcuts.js',
+    './js/pip-mode.js',
     './js/app_browser.js',
     './models/psl_labels.json',
     './models/sign_thresholds.json',
     './models/urdu_mapping.json',
     './models/model_version.json',
-    './manifest.json'              // ADDED: PWA manifest
+    './manifest.json',
+    './assets/logo_fyp_v2.png'     // ADDED: Logo for PWA
 ];
 
 // Large files to cache separately (with progress tracking)

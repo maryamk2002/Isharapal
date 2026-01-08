@@ -15,7 +15,7 @@
     justify-content: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    background: linear-gradient(135deg, #26a69a, #0097a7);
     border: none;
     border-radius: 8px;
     color: white;
@@ -23,16 +23,16 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 2px 4px rgba(38, 166, 154, 0.3);
 }
 
 .analytics-toggle:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 8px rgba(38, 166, 154, 0.4);
 }
 
 .analytics-toggle.active {
-    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    background: linear-gradient(135deg, #1e8a80, #007a87);
 }
 
 .analytics-toggle svg {
@@ -81,7 +81,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 1rem 1.25rem;
-    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    background: linear-gradient(135deg, #7ac142 0%, #26a69a 50%, #0097a7 100%);
     color: white;
 }
 
@@ -199,7 +199,7 @@
 .analytics-section h4 svg {
     width: 16px;
     height: 16px;
-    color: #6366f1;
+    color: #26a69a;
 }
 
 [data-theme="dark"] .analytics-section h4 {
@@ -443,7 +443,7 @@
 
 .mastery-bar {
     height: 100%;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    background: linear-gradient(90deg, #7ac142, #26a69a, #0097a7);
     border-radius: 6px;
     transition: width 0.3s ease;
 }
