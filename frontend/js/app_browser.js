@@ -695,11 +695,16 @@ class PSLRecognitionApp {
         }
         
         // Analytics Toggle - NOTE: analytics.js handles its own toggle listener
-        // We just need to sync the button active state when panel visibility changes
-        const analyticsToggle = document.getElementById('analyticsToggle');
+        // But we need to handle the close button here
+        const analyticsClose = document.getElementById('analyticsClose');
         
-        // The analytics panel already sets up its own toggle listener in analytics.js
-        // No duplicate listener needed here - that was causing double-toggle bug!
+        if (analyticsClose) {
+            analyticsClose.addEventListener('click', () => {
+                if (this.analyticsPanel) {
+                    this.analyticsPanel.hide();
+                }
+            });
+        }
         
         // Innovation Module Toggles
         this.setupInnovationListeners();
@@ -810,8 +815,8 @@ class PSLRecognitionApp {
             });
         }
         
-        // Word Shortcuts Toggle - NOTE: word-shortcuts.js handles its own toggle listener
-        // No duplicate listener needed here - that was causing double-toggle bug!
+        // Word Shortcuts - NOTE: word-shortcuts.js handles its own toggle and close listeners
+        // No additional handlers needed here
         
         // PiP Mode Toggle
         const pipToggle = document.getElementById('pipToggle');
