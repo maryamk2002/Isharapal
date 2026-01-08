@@ -259,8 +259,8 @@ class CameraManager {
         // The old test-based approach was causing delays and handler issues
         return new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                reject(new Error('MediaPipe loading timeout (10s). Check your internet connection.'));
-            }, 10000); // 10 second timeout
+                reject(new Error('MediaPipe loading timeout (45s). Check your internet connection.'));
+            }, 45000); // 45 second timeout - WASM files are ~10MB
             
             console.log('⏳ Initializing MediaPipe handler...');
             this.emit('mediapipe_loading', { status: 'initializing', message: 'Setting up hand detection...' });
