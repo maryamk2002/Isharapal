@@ -634,6 +634,26 @@ body {
     animation: ellipsis 1.5s infinite;
 }
 
+/* ===========================================
+   POLISH: Success Celebration Animation
+   Subtle green pulse when sign is recognized
+   =========================================== */
+.prediction-display.success-pulse {
+    animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 0 15px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: none;
+    }
+}
+
 @keyframes ellipsis {
     0%, 20% { content: '.'; }
     40% { content: '..'; }
@@ -671,11 +691,13 @@ body {
 @keyframes signFadeIn {
     0% {
         opacity: 0;
-        transform: scale(0.95) translateY(5px);
+        transform: scale(0.85) translateY(8px);
+        filter: blur(3px);
     }
     100% {
         opacity: 1;
         transform: scale(1) translateY(0);
+        filter: blur(0);
     }
 }
 
@@ -825,6 +847,17 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+/* Active states for touch feedback - critical for mobile UX */
+.feedback-correct:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.feedback-incorrect:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
 /* History Card - Compact */
 .history-content-compact {
     padding: 1rem;
@@ -840,9 +873,12 @@ body {
 
 .history-empty-simple {
     text-align: center;
-    padding: 1.5rem 1rem;
+    padding: 2rem 1.5rem;
     color: var(--gray-400);
     font-size: 0.875rem;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.03), rgba(20, 184, 166, 0.03));
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--gray-200);
 }
 
 .history-item {

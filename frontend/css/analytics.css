@@ -54,7 +54,7 @@
     background: var(--card-bg, #ffffff);
     border-radius: 16px 0 0 16px;
     box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
-    z-index: 1000;
+    z-index: 1100; /* Increased from 1000 to avoid header conflict */
     transition: right 0.3s ease;
     overflow: hidden;
     display: flex;

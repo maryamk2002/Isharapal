@@ -101,16 +101,21 @@
         /* Header Toggle Buttons */
         .header-toggles {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             margin-right: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 320px;
         }
         
         .toggle-btn {
             background: var(--zen-accent-soft);
             border: 1px solid var(--zen-card-border);
             border-radius: 8px;
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -130,7 +135,8 @@
         }
         
         .toggle-btn:active {
-            transform: scale(0.95);
+            transform: scale(0.92);
+            opacity: 0.9;
         }
         
         .toggle-icon {
@@ -651,12 +657,14 @@
         }
         
         .history-fb-btn {
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            min-height: 32px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             transition: all 0.25s ease;
             display: flex;
@@ -686,6 +694,19 @@
             color: white;
             transform: scale(1.1);
             box-shadow: 0 4px 12px rgba(201, 120, 120, 0.3);
+        }
+        
+        /* Active states for history feedback buttons */
+        .history-fb-correct:active {
+            transform: scale(0.9);
+            background: var(--zen-success);
+            color: white;
+        }
+        
+        .history-fb-incorrect:active {
+            transform: scale(0.9);
+            background: var(--zen-error);
+            color: white;
         }
         
         .history-fb-done {
@@ -729,9 +750,10 @@
             background: transparent;
             border: 1px solid rgba(90, 154, 138, 0.3);
             color: var(--zen-text-muted);
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 0.75rem;
+            padding: 6px 14px;
+            min-height: 36px;
+            border-radius: 8px;
+            font-size: 0.8rem;
             cursor: pointer;
             transition: all 0.2s ease;
         }
@@ -740,6 +762,10 @@
             background: var(--zen-accent-soft);
             border-color: var(--zen-accent);
             color: var(--zen-accent);
+        }
+        
+        .clear-history-btn:active {
+            transform: scale(0.95);
         }
         
         /* ==========================================
@@ -869,12 +895,14 @@
         }
         
         .letter-fb-btn {
-            width: 24px;
-            height: 24px;
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            min-height: 32px;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: bold;
             transition: all 0.2s ease;
             display: flex;
@@ -904,6 +932,19 @@
             color: white;
             transform: scale(1.15);
             box-shadow: 0 3px 10px rgba(201, 120, 120, 0.35);
+        }
+        
+        /* Active states for letter feedback - touch feedback */
+        .letter-fb-correct:active {
+            transform: scale(0.9);
+            background: var(--zen-success);
+            color: white;
+        }
+        
+        .letter-fb-incorrect:active {
+            transform: scale(0.9);
+            background: var(--zen-error);
+            color: white;
         }
         
         .letter-fb-done {
@@ -1076,10 +1117,15 @@
             border: 1px solid rgba(90, 154, 138, 0.2);
             border-radius: 8px;
             padding: 8px 12px;
+            min-width: 44px;
+            min-height: 44px;
             cursor: pointer;
             font-size: 14px;
             transition: all 0.25s ease;
             color: var(--zen-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .sentence-btn:hover {
@@ -1087,6 +1133,11 @@
             color: white;
             transform: scale(1.05);
             box-shadow: 0 4px 12px rgba(90, 154, 138, 0.25);
+        }
+        
+        .sentence-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 6px rgba(90, 154, 138, 0.3);
         }
         
         .sentence-content {
@@ -1235,7 +1286,8 @@
         }
         
         .word-action-btn:active {
-            transform: scale(0.98);
+            transform: scale(0.95);
+            background: rgba(90, 154, 138, 0.2);
         }
         
         .word-action-btn .urdu-small {
@@ -1474,17 +1526,20 @@
                 display: none;
             }
             
-            /* Compact toggles for small screens */
+            /* Compact toggles for small screens - allow wrap */
             .header-toggles {
                 gap: 4px;
                 margin-right: 6px;
+                max-width: 260px;
+                flex-wrap: wrap;
             }
             
             .toggle-btn {
-                width: 36px;
-                height: 36px;
-                min-width: 36px;
-                font-size: 1rem;
+                width: 34px;
+                height: 34px;
+                min-width: 34px;
+                min-height: 34px;
+                font-size: 0.95rem;
                 border-radius: 6px;
             }
             
