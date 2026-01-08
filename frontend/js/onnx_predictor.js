@@ -80,6 +80,10 @@ class ONNXPredictor {
         // NEW: Previous frame for jitter detection
         this.previousLandmarks = null;
         
+        // CRITICAL FIX: Inference lock to prevent overlapping calls
+        this._isInferenceRunning = false;
+        this._pendingInference = false;
+        
         // Event callbacks
         this.onPrediction = null;
         this.onReady = null;
@@ -360,6 +364,7 @@ class ONNXPredictor {
     
     /**
      * Make prediction on current sliding window.
+     * CRITICAL FIX: Added inference lock to prevent overlapping calls
      * @param {boolean} returnAllPredictions - Whether to return all class predictions
      * @returns {Object} Prediction result
      */
@@ -372,6 +377,17 @@ class ONNXPredictor {
             };
         }
         
+        // CRITICAL FIX: Prevent overlapping inference calls
+        if (this._isInferenceRunning) {
+            this._pendingInference = true;
+            return {
+                ready: true,
+                status: 'inference_busy',
+                bufferSize: this.frameBuffer.length,
+                message: 'Previous inference still running'
+            };
+        }
+        
         // Check if buffer has enough frames
         if (this.frameBuffer.length < this.config.minPredictionFrames) {
             return {
@@ -381,6 +397,10 @@ class ONNXPredictor {
                 status: 'collecting_frames'
             };
         }
+        
+        // Set inference lock
+        this._isInferenceRunning = true;
+        this._pendingInference = false;
         
         try {
             const startTime = performance.now();
@@ -453,8 +473,9 @@ class ONNXPredictor {
                     timestamp: Date.now()
                 });
                 
-                // Keep only recent predictions
-                while (this.predictionHistory.length > this.config.stabilityVotes) {
+                // Keep only recent predictions (HARD LIMIT: max 10 to prevent memory issues)
+                const maxHistory = Math.min(this.config.stabilityVotes + 2, 10);
+                while (this.predictionHistory.length > maxHistory) {
                     this.predictionHistory.shift();
                 }
             }
@@ -532,12 +553,26 @@ class ONNXPredictor {
         } catch (error) {
             console.error('[ONNXPredictor] Prediction failed:', error);
             this._updateStats(0, 0, false);
+            
+            // STABILITY FIX: Detect unrecoverable errors
+            const errMsg = error.message?.toLowerCase() || '';
+            if (errMsg.includes('memory') || errMsg.includes('oom') || errMsg.includes('out of memory')) {
+                console.error('[ONNXPredictor] Memory error - session may be corrupted');
+                this.isReady = false;
+                if (this.onError) {
+                    this.onError({ message: 'GPU memory error. Please refresh the page.', fatal: true });
+                }
+            }
+            
             return {
                 ready: true,
                 status: 'error',
                 error: error.message,
                 bufferSize: this.frameBuffer.length
             };
+        } finally {
+            // CRITICAL FIX: Always release inference lock
+            this._isInferenceRunning = false;
         }
     }
     

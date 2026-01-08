@@ -469,23 +469,38 @@ class CameraManager {
     
     startFrameCapture() {
         if (this.frameInterval) {
-            clearInterval(this.frameInterval);
+            cancelAnimationFrame(this.frameInterval);
+            this.frameInterval = null;
         }
         
-        const interval = 1000 / this.frameRate;
-        this.frameInterval = setInterval(() => {
-            this.captureFrame();
-        }, interval);
+        // PERFORMANCE FIX: Use requestAnimationFrame for smoother frame timing
+        // This syncs with display refresh and is more battery-efficient
+        const targetInterval = 1000 / this.frameRate;
+        let lastCaptureTime = 0;
+        
+        const captureLoop = (currentTime) => {
+            if (!this.isActive) return;
+            
+            // Throttle to target FPS
+            if (currentTime - lastCaptureTime >= targetInterval) {
+                this.captureFrame();
+                lastCaptureTime = currentTime;
+            }
+            
+            this.frameInterval = requestAnimationFrame(captureLoop);
+        };
+        
+        this.frameInterval = requestAnimationFrame(captureLoop);
         
         // Start watchdog timer to detect MediaPipe freezes
         this.startWatchdog();
         
-        console.log(`Frame capture started at ${this.frameRate} FPS`);
+        console.log(`Frame capture started at ${this.frameRate} FPS (rAF)`);
     }
     
     stopFrameCapture() {
         if (this.frameInterval) {
-            clearInterval(this.frameInterval);
+            cancelAnimationFrame(this.frameInterval);
             this.frameInterval = null;
         }
         
@@ -526,13 +541,15 @@ class CameraManager {
     }
     
     async attemptMediaPipeRecovery() {
-        // Prevent concurrent recovery attempts
-        if (this.isRecovering) {
-            console.log('[Camera] Recovery already in progress, skipping');
+        // STABILITY FIX: Prevent concurrent recovery attempts with timestamp check
+        const recoveryId = Date.now();
+        if (this.isRecovering && this._recoveryStartTime && (recoveryId - this._recoveryStartTime) < 10000) {
+            console.log('[Camera] Recovery in progress, skipping');
             return;
         }
         
         this.isRecovering = true;
+        this._recoveryStartTime = recoveryId;
         this.recoveryAttempts++;
         
         console.log(`🔄 Attempting MediaPipe recovery (attempt ${this.recoveryAttempts}/${this.maxRecoveryAttempts})...`);
@@ -712,14 +729,12 @@ class CameraManager {
                 this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             }
             
-            // Draw hand landmarks with improved visualization
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0 && this.ctx) {
-                this.drawHandLandmarksImproved(results.multiHandLandmarks);
+            // Process hand landmarks (drawing handled by visualization.js to avoid double-draw)
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // NOTE: Removed drawing here - visualization.js handles canvas rendering
+                // This prevents double-drawing which causes lag and visual glitches
                 this.stats.handDetections++;
                 this.consecutiveNoHands = 0; // Reset counter
-                
-                // Show hand detection indicator
-                this.showHandDetectionIndicator(true);
                 
                 // V3: Convert landmarks to 189-feature array and emit
                 const landmarks189 = this.convertLandmarksTo189(results.multiHandLandmarks);

@@ -7,8 +7,8 @@
  * - HTML, CSS, JS files
  */
 
-const CACHE_NAME = 'isharapal-v4';
-const CACHE_VERSION = '4.0.0';  // UPDATED: Force cache refresh after bug fixes
+const CACHE_NAME = 'isharapal-v5';
+const CACHE_VERSION = '5.0.0';  // UPDATED: Performance optimizations + sign images cache
 
 // Files to cache for offline use
 const STATIC_CACHE = [
@@ -44,6 +44,51 @@ const LARGE_CACHE = [
     './models/psl_model_v2.onnx'
 ];
 
+// Sign images for practice mode (cached for offline use)
+const SIGN_IMAGES_CACHE = [
+    './assets/signs/manifest.json',
+    './assets/signs/1-Hay.webp', './assets/signs/1-Hay.jpg',
+    './assets/signs/2-Hay.webp', './assets/signs/2-Hay.jpg',
+    './assets/signs/Ain.webp', './assets/signs/Ain.jpg',
+    './assets/signs/Alif.webp', './assets/signs/Alif.jpg',
+    './assets/signs/Alifmad.webp', './assets/signs/Alifmad.jpg',
+    './assets/signs/Aray.webp', './assets/signs/Aray.jpg',
+    './assets/signs/Bay.webp', './assets/signs/Bay.jpg',
+    './assets/signs/Byeh.webp', './assets/signs/Byeh.jpg',
+    './assets/signs/Chay.webp', './assets/signs/Chay.jpg',
+    './assets/signs/Cyeh.webp', './assets/signs/Cyeh.jpg',
+    './assets/signs/Daal.webp', './assets/signs/Daal.jpg',
+    './assets/signs/Dal.webp', './assets/signs/Dal.jpg',
+    './assets/signs/Dochahay.webp', './assets/signs/Dochahay.jpg',
+    './assets/signs/Fay.webp', './assets/signs/Fay.jpg',
+    './assets/signs/Gaaf.webp', './assets/signs/Gaaf.jpg',
+    './assets/signs/Ghain.webp', './assets/signs/Ghain.jpg',
+    './assets/signs/Hamza.webp', './assets/signs/Hamza.jpg',
+    './assets/signs/Jeem.webp', './assets/signs/Jeem.jpg',
+    './assets/signs/Kaf.webp', './assets/signs/Kaf.jpg',
+    './assets/signs/Khay.webp', './assets/signs/Khay.jpg',
+    './assets/signs/Kiaf.webp', './assets/signs/Kiaf.jpg',
+    './assets/signs/Lam.webp', './assets/signs/Lam.jpg',
+    './assets/signs/Meem.webp', './assets/signs/Meem.jpg',
+    './assets/signs/Nuun.webp', './assets/signs/Nuun.jpg',
+    './assets/signs/Nuungh.webp', './assets/signs/Nuungh.jpg',
+    './assets/signs/Pay.webp', './assets/signs/Pay.jpg',
+    './assets/signs/Ray.webp', './assets/signs/Ray.jpg',
+    './assets/signs/Say.webp', './assets/signs/Say.jpg',
+    './assets/signs/Seen.webp', './assets/signs/Seen.jpg',
+    './assets/signs/Sheen.webp', './assets/signs/Sheen.jpg',
+    './assets/signs/Suad.webp', './assets/signs/Suad.jpg',
+    './assets/signs/Taay.webp', './assets/signs/Taay.jpg',
+    './assets/signs/Tay.webp', './assets/signs/Tay.jpg',
+    './assets/signs/Tuey.webp', './assets/signs/Tuey.jpg',
+    './assets/signs/Wao.webp', './assets/signs/Wao.jpg',
+    './assets/signs/Zaal.webp', './assets/signs/Zaal.jpg',
+    './assets/signs/Zaey.webp', './assets/signs/Zaey.jpg',
+    './assets/signs/Zay.webp', './assets/signs/Zay.jpg',
+    './assets/signs/Zuad.webp', './assets/signs/Zuad.jpg',
+    './assets/signs/Zuey.webp', './assets/signs/Zuey.jpg'
+];
+
 // External CDN resources (cached on first use)
 const CDN_CACHE = [
     'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js',
@@ -69,6 +114,13 @@ self.addEventListener('install', (event) => {
                 // Cache large files (model) - don't fail install if this fails
                 return cache.addAll(LARGE_CACHE).then(() => {
                     console.log('[SW] Model cached');
+                    
+                    // Cache sign images for practice mode - don't fail if missing
+                    return cache.addAll(SIGN_IMAGES_CACHE).then(() => {
+                        console.log('[SW] Sign images cached for offline practice mode');
+                    }).catch((err) => {
+                        console.warn('[SW] Sign images caching failed (will cache on first use):', err);
+                    });
                 }).catch((err) => {
                     console.warn('[SW] Model caching failed (will cache on first use):', err);
                 });

@@ -200,10 +200,18 @@ body {
 
 .workspace-grid {
     display: grid;
-    grid-template-columns: 1.2fr 0.8fr;
-    gap: 2rem;
+    grid-template-columns: 1fr 1fr; /* FIXED: Equal columns for better balance */
+    gap: 1.5rem;
     align-items: start;
     overflow: visible;
+}
+
+/* Larger screens - slightly favor video column */
+@media (min-width: 1200px) {
+    .workspace-grid {
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 2rem;
+    }
 }
 
 /* ========================================
@@ -543,11 +551,11 @@ body {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    position: sticky;
-    top: 90px;
-    max-height: calc(100vh - 110px);
-    overflow-y: auto;
+    /* FIXED: Removed sticky positioning and max-height that was cutting off content */
+    /* Allow natural height, let cards be fully visible */
     align-self: start;
+    min-width: 0; /* Prevent flex overflow issues */
+    width: 100%;
 }
 
 /* Prediction Card */

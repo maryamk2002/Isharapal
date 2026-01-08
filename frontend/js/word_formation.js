@@ -186,26 +186,48 @@ class WordFormation {
     
     /**
      * Start the pause detection loop.
+     * OPTIMIZED: Uses adaptive interval - slower when idle, faster when forming
      */
     startPauseDetection() {
         if (this.pauseCheckInterval) {
             clearInterval(this.pauseCheckInterval);
         }
         
-        // Check every 100ms for smooth countdown
-        this.pauseCheckInterval = setInterval(() => {
-            this.checkPause();
-        }, 100);
+        // PERFORMANCE: Adaptive interval - check less often when idle
+        this._pauseCheckActive = true;
         
-        console.log('[WordFormation] Pause detection started');
+        const adaptivePauseCheck = () => {
+            if (!this._pauseCheckActive) {
+                return; // Stopped
+            }
+            
+            // Skip checking if no word is being formed
+            if (this.currentWord.length === 0) {
+                // OPTIMIZATION: Use longer interval when idle (500ms)
+                this.pauseCheckInterval = setTimeout(adaptivePauseCheck, 500);
+                return;
+            }
+            
+            // Check pause when forming a word
+            this.checkPause();
+            
+            // OPTIMIZATION: Use shorter interval when actively forming (150ms for smooth countdown)
+            this.pauseCheckInterval = setTimeout(adaptivePauseCheck, 150);
+        };
+        
+        // Start with immediate check
+        this.pauseCheckInterval = setTimeout(adaptivePauseCheck, 100);
+        
+        console.log('[WordFormation] Pause detection started (adaptive interval)');
     }
     
     /**
      * Stop the pause detection loop.
      */
     stopPauseDetection() {
+        this._pauseCheckActive = false;
         if (this.pauseCheckInterval) {
-            clearInterval(this.pauseCheckInterval);
+            clearTimeout(this.pauseCheckInterval);
             this.pauseCheckInterval = null;
         }
     }
@@ -225,7 +247,8 @@ class WordFormation {
         }
         
         const now = Date.now();
-        const timeSinceLastPrediction = now - this.lastPredictionTime;
+        // STABILITY FIX: Cap time value to prevent extreme values from clock issues
+        const timeSinceLastPrediction = Math.min(now - this.lastPredictionTime, 60000);
         
         // Calculate pause progress (0 to 1)
         const pauseProgress = Math.min(1, timeSinceLastPrediction / this.config.pauseThresholdMs);

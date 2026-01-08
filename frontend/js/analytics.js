@@ -329,12 +329,30 @@ class AnalyticsPanel {
     
     /**
      * Start periodic updates
+     * OPTIMIZED: Only update when panel is visible
      */
     startUpdates() {
         this.stopUpdates();
-        this.updateInterval = setInterval(() => {
-            this.render();
-        }, this.updateIntervalMs);
+        
+        // Use requestAnimationFrame-based update for better performance
+        let lastUpdate = 0;
+        const updateLoop = (timestamp) => {
+            if (!this.isVisible) {
+                // Panel hidden - don't schedule next update (saves CPU)
+                this.updateInterval = null;
+                return;
+            }
+            
+            // Throttle to updateIntervalMs
+            if (timestamp - lastUpdate >= this.updateIntervalMs) {
+                this.render();
+                lastUpdate = timestamp;
+            }
+            
+            this.updateInterval = requestAnimationFrame(updateLoop);
+        };
+        
+        this.updateInterval = requestAnimationFrame(updateLoop);
     }
     
     /**
@@ -342,7 +360,7 @@ class AnalyticsPanel {
      */
     stopUpdates() {
         if (this.updateInterval) {
-            clearInterval(this.updateInterval);
+            cancelAnimationFrame(this.updateInterval);
             this.updateInterval = null;
         }
     }

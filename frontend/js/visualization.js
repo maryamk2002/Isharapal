@@ -51,10 +51,11 @@ class HandVisualizer {
             this.ctx.lineCap = 'round';
             this.ctx.lineJoin = 'round';
             
-            // Start animation loop
-            this.startAnimation();
+            // PERFORMANCE FIX: Don't auto-start animation loop
+            // Animation will start when recognition starts (saves CPU when idle)
+            // this.startAnimation(); // Removed - started by app_browser.js
             
-            console.log('Hand visualizer initialized');
+            console.log('Hand visualizer initialized (animation paused until recognition starts)');
             return true;
             
         } catch (error) {

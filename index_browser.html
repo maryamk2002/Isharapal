@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -6,20 +6,20 @@
     <title>ISHARAPAL - Browser Mode | Pakistan Sign Language Recognition</title>
     
     <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👋</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>ðŸ‘‹</text></svg>">
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="frontend/manifest.json">
     <meta name="theme-color" content="#5a9a8a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ISHARAPAL">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="css/urdu-fonts.css">
-    <link rel="stylesheet" href="css/main_v2.css">
-    <link rel="stylesheet" href="css/analytics.css">
-    <link rel="stylesheet" href="css/innovations.css">
+    <link rel="stylesheet" href="frontend/css/urdu-fonts.css">
+    <link rel="stylesheet" href="frontend/css/main_v2.css">
+    <link rel="stylesheet" href="frontend/css/analytics.css">
+    <link rel="stylesheet" href="frontend/css/innovations.css">
     
     <!-- MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -1721,7 +1721,7 @@
 <body>
     <!-- Browser Mode Banner -->
     <div class="browser-mode-banner">
-        <span class="icon">🌐</span>
+        <span class="icon">ðŸŒ</span>
         <span>Browser Mode - No server required! All processing happens locally.</span>
     </div>
 
@@ -1730,10 +1730,10 @@
         <div class="container">
             <div class="header-content">
                 <div class="logo-section">
-                    <div class="logo-icon">👋</div>
+                    <div class="logo-icon">ðŸ‘‹</div>
                     <div class="title-group">
                         <h1 class="title-main urdu">ISHARAPAL</h1>
-                        <p class="title-sub">پاکستانی اشاراتی زبان</p>
+                        <p class="title-sub">Ù¾Ø§Ú©Ø³ØªØ§Ù†ÛŒ Ø§Ø´Ø§Ø±Ø§ØªÛŒ Ø²Ø¨Ø§Ù†</p>
                     </div>
                 </div>
                 
@@ -1741,25 +1741,25 @@
                     <!-- Quick Toggles -->
                                     <div class="header-toggles">
                                         <button class="toggle-btn" id="themeToggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
-                                            <span class="toggle-icon" id="themeIcon">🌙</span>
+                                            <span class="toggle-icon" id="themeIcon">ðŸŒ™</span>
                                         </button>
                                         <button class="toggle-btn" id="soundToggle" title="Toggle Sound Effects" aria-label="Toggle sound">
-                                            <span class="toggle-icon" id="soundIcon">🔊</span>
+                                            <span class="toggle-icon" id="soundIcon">ðŸ”Š</span>
                                         </button>
                                         <button class="toggle-btn" id="ttsToggle" title="Toggle Text-to-Speech" aria-label="Toggle speech">
-                                            <span class="toggle-icon" id="ttsIcon">🗣️</span>
+                                            <span class="toggle-icon" id="ttsIcon">ðŸ—£ï¸</span>
                                         </button>
                                         <button class="toggle-btn analytics-toggle" id="analyticsToggle" title="Toggle Analytics Dashboard" aria-label="Toggle analytics">
-                                            <span class="toggle-icon">📊</span>
+                                            <span class="toggle-icon">ðŸ“Š</span>
                                         </button>
                                         <button class="toggle-btn" id="practiceToggle" title="Practice Mode" aria-label="Toggle practice mode">
-                                            <span class="toggle-icon">🎯</span>
+                                            <span class="toggle-icon">ðŸŽ¯</span>
                                         </button>
                                         <button class="toggle-btn" id="shortcutsToggle" title="Word Shortcuts" aria-label="Toggle word shortcuts">
-                                            <span class="toggle-icon">⚡</span>
+                                            <span class="toggle-icon">âš¡</span>
                                         </button>
                                         <button class="toggle-btn pip-toggle-btn" id="pipToggle" title="Picture-in-Picture Mode" aria-label="Toggle floating mode">
-                                            <span class="toggle-icon">📌</span>
+                                            <span class="toggle-icon">ðŸ“Œ</span>
                                         </button>
                                     </div>
                     <div class="connection-badge browser-mode" id="connectionBadge" role="status" aria-live="polite">
@@ -1782,11 +1782,11 @@
                         <!-- Video Header - Compact -->
                         <div class="card-header-simple">
                             <h2 class="card-title-simple">
-                                <span class="icon">📹</span>
+                                <span class="icon">ðŸ“¹</span>
                                 Camera
                             </h2>
                             <div class="hand-detection-status" id="handStatus" role="status" aria-live="polite">
-                                <span class="status-icon" aria-hidden="true">✋</span>
+                                <span class="status-icon" aria-hidden="true">âœ‹</span>
                                 <span class="status-label">No hands</span>
                             </div>
                         </div>
@@ -1800,11 +1800,11 @@
                                 <!-- MediaPipe Error Overlay -->
                                 <div class="mediapipe-error-overlay" id="mediapipeErrorOverlay" style="display: none;">
                                     <div class="error-content">
-                                        <div class="error-icon">⚠️</div>
+                                        <div class="error-icon">âš ï¸</div>
                                         <div class="error-title">Hand Detection Issue</div>
                                         <div class="error-message" id="mediapipeErrorMessage">MediaPipe is not responding</div>
                                         <button class="error-retry-btn" id="mediapipeRetryBtn">
-                                            <span>🔄</span> Retry
+                                            <span>ðŸ”„</span> Retry
                                         </button>
                                     </div>
                                 </div>
@@ -1816,7 +1816,7 @@
                                         <div class="model-status-text" id="modelStatusText">Loading AI Model...</div>
                                         <div class="model-status-progress" id="modelStatusProgress"></div>
                                         <button class="error-retry-btn" id="modelRetryBtn" style="display: none;">
-                                            <span>🔄</span> Retry Loading
+                                            <span>ðŸ”„</span> Retry Loading
                                         </button>
                                     </div>
                                 </div>
@@ -1836,23 +1836,23 @@
                         <!-- Controls -->
                         <div class="control-panel">
                             <button id="startBtn" class="btn btn-start" aria-label="Start sign language recognition (Press Space or Enter)">
-                                <span class="btn-icon" aria-hidden="true">▶</span>
+                                <span class="btn-icon" aria-hidden="true">â–¶</span>
                                 <span class="btn-text">
-                                    <span class="urdu">شروع کریں</span>
+                                    <span class="urdu">Ø´Ø±ÙˆØ¹ Ú©Ø±ÛŒÚº</span>
                                     <span class="english">Start Recognition</span>
                                 </span>
                             </button>
                             <button id="stopBtn" class="btn btn-stop" disabled aria-label="Stop recognition (Press Esc)">
-                                <span class="btn-icon" aria-hidden="true">⏸</span>
+                                <span class="btn-icon" aria-hidden="true">â¸</span>
                                 <span class="btn-text">
-                                    <span class="urdu">روکیں</span>
+                                    <span class="urdu">Ø±ÙˆÚ©ÛŒÚº</span>
                                     <span class="english">Stop</span>
                                 </span>
                             </button>
                             <button id="resetBtn" class="btn btn-reset" aria-label="Reset system (Press R)">
-                                <span class="btn-icon" aria-hidden="true">↻</span>
+                                <span class="btn-icon" aria-hidden="true">â†»</span>
                                 <span class="btn-text">
-                                    <span class="urdu">ری سیٹ</span>
+                                    <span class="urdu">Ø±ÛŒ Ø³ÛŒÙ¹</span>
                                     <span class="english">Reset</span>
                                 </span>
                             </button>
@@ -1862,15 +1862,15 @@
                     <!-- Compact Stats Bar -->
                     <div class="stats-bar">
                         <div class="stat-item">
-                            <span class="stat-icon">⚡</span>
+                            <span class="stat-icon">âš¡</span>
                             <span class="stat-value" id="systemStatusValue">Ready</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-icon">📊</span>
+                            <span class="stat-icon">ðŸ“Š</span>
                             <span class="stat-value" id="signCountValue">0</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-icon">⏱</span>
+                            <span class="stat-icon">â±</span>
                             <span class="stat-value"><span id="fpsValue">0</span> FPS</span>
                         </div>
                     </div>
@@ -1883,7 +1883,7 @@
                     <div class="prediction-card">
                         <div class="card-header-simple">
                             <h2 class="card-title-simple">
-                                <span class="icon">✨</span>
+                                <span class="icon">âœ¨</span>
                                 Current Sign
                             </h2>
                         </div>
@@ -1892,9 +1892,9 @@
                             <!-- Prediction Display -->
                             <div class="prediction-display" id="predictionDisplay" role="status" aria-live="assertive" aria-atomic="true">
                                 <div class="prediction-placeholder">
-                                    <div class="placeholder-icon" aria-hidden="true">👋</div>
+                                    <div class="placeholder-icon" aria-hidden="true">ðŸ‘‹</div>
                                     <div class="placeholder-text">
-                                        <span class="urdu">اشارہ دکھائیں</span>
+                                        <span class="urdu">Ø§Ø´Ø§Ø±Û Ø¯Ú©Ú¾Ø§Ø¦ÛŒÚº</span>
                                         <span class="english">Show a sign to begin</span>
                                     </div>
                                 </div>
@@ -1915,21 +1915,21 @@
                         <!-- Feedback Section -->
                         <div class="feedback-section" id="feedbackSection">
                             <div class="feedback-header">
-                                <span class="urdu">کیا یہ صحیح ہے؟</span>
+                                <span class="urdu">Ú©ÛŒØ§ ÛŒÛ ØµØ­ÛŒØ­ ÛÛ’ØŸ</span>
                                 <span class="english">Was this correct?</span>
                             </div>
                             <div class="feedback-buttons">
                                 <button id="feedbackCorrect" class="feedback-btn feedback-correct" aria-label="Mark prediction as correct (Press C)">
-                                    <span class="feedback-icon" aria-hidden="true">✓</span>
+                                    <span class="feedback-icon" aria-hidden="true">âœ“</span>
                                     <span class="feedback-text">
-                                        <span class="urdu">صحیح</span>
+                                        <span class="urdu">ØµØ­ÛŒØ­</span>
                                         <span class="english">Correct</span>
                                     </span>
                                 </button>
                                 <button id="feedbackIncorrect" class="feedback-btn feedback-incorrect" aria-label="Mark prediction as incorrect (Press I)">
-                                    <span class="feedback-icon" aria-hidden="true">✗</span>
+                                    <span class="feedback-icon" aria-hidden="true">âœ—</span>
                                     <span class="feedback-text">
-                                        <span class="urdu">غلط</span>
+                                        <span class="urdu">ØºÙ„Ø·</span>
                                         <span class="english">Incorrect</span>
                                     </span>
                                 </button>
@@ -1941,19 +1941,19 @@
                     <div class="sentence-card">
                         <div class="card-header-simple">
                             <h3 class="card-title-simple">
-                                <span class="icon">📖</span>
-                                <span class="urdu-small">الفاظ</span>
+                                <span class="icon">ðŸ“–</span>
+                                <span class="urdu-small">Ø§Ù„ÙØ§Ø¸</span>
                                 Word Formation
                             </h3>
                             <div class="sentence-controls">
                                 <button class="sentence-btn" id="speakTextBtn" title="Speak text aloud">
-                                    <span>🔊</span>
+                                    <span>ðŸ”Š</span>
                                 </button>
                                 <button class="sentence-btn" id="copyTextBtn" title="Copy to clipboard">
-                                    <span>📋</span>
+                                    <span>ðŸ“‹</span>
                                 </button>
                                 <button class="sentence-btn" id="clearTextBtn" title="Clear all">
-                                    <span>🗑️</span>
+                                    <span>ðŸ—‘ï¸</span>
                                 </button>
                             </div>
                         </div>
@@ -1967,13 +1967,13 @@
                             
                             <!-- Sentence Display (RTL for Urdu) -->
                             <div class="sentence-display urdu" id="sentenceDisplay" dir="rtl">
-                                <span class="sentence-placeholder">الفاظ یہاں ظاہر ہوں گے</span>
+                                <span class="sentence-placeholder">Ø§Ù„ÙØ§Ø¸ ÛŒÛØ§Úº Ø¸Ø§ÛØ± ÛÙˆÚº Ú¯Û’</span>
                             </div>
                             
                             <!-- Current Word Being Formed -->
                             <div class="current-word-section">
                                 <div class="current-word-label">
-                                    <span class="urdu-small">موجودہ لفظ:</span>
+                                    <span class="urdu-small">Ù…ÙˆØ¬ÙˆØ¯Û Ù„ÙØ¸:</span>
                                     <span class="english-small">Current word:</span>
                                 </div>
                                 <div class="current-word urdu" id="currentWordDisplay" dir="rtl">-</div>
@@ -1982,15 +1982,15 @@
                             <!-- Quick Actions -->
                             <div class="word-actions">
                                 <button class="word-action-btn" id="addSpaceBtn" title="Complete word (add space)">
-                                    <span class="urdu-small">فاصلہ</span>
+                                    <span class="urdu-small">ÙØ§ØµÙ„Û</span>
                                     <span class="english-small">Space</span>
                                 </button>
                                 <button class="word-action-btn" id="deleteLetterBtn" title="Delete last letter">
-                                    <span class="urdu-small">حرف مٹائیں</span>
+                                    <span class="urdu-small">Ø­Ø±Ù Ù…Ù¹Ø§Ø¦ÛŒÚº</span>
                                     <span class="english-small">Delete</span>
                                 </button>
                                 <button class="word-action-btn" id="deleteWordBtn" title="Delete last word">
-                                    <span class="urdu-small">لفظ مٹائیں</span>
+                                    <span class="urdu-small">Ù„ÙØ¸ Ù…Ù¹Ø§Ø¦ÛŒÚº</span>
                                     <span class="english-small">Undo Word</span>
                                 </button>
                             </div>
@@ -1998,9 +1998,9 @@
                             <!-- Letter History with Feedback -->
                             <div class="letter-history-section">
                                 <div class="letter-history-header">
-                                    <span class="urdu-small">حروف کی تاریخ:</span>
+                                    <span class="urdu-small">Ø­Ø±ÙˆÙ Ú©ÛŒ ØªØ§Ø±ÛŒØ®:</span>
                                     <span class="english-small">Letter History</span>
-                                    <button class="clear-letters-btn" id="clearLettersBtn" title="Clear letter history">🗑️</button>
+                                    <button class="clear-letters-btn" id="clearLettersBtn" title="Clear letter history">ðŸ—‘ï¸</button>
                                 </div>
                                 <div class="letter-history-list" id="letterHistoryList">
                                     <div class="letter-history-empty">
@@ -2015,7 +2015,7 @@
                     <div class="history-card">
                         <div class="card-header-simple">
                             <h3 class="card-title-simple">
-                                <span class="icon">📝</span>
+                                <span class="icon">ðŸ“</span>
                                 Recent Signs
                             </h3>
                             <button class="clear-history-btn" id="clearHistoryBtn" style="display: none;">Clear</button>
@@ -2040,7 +2040,7 @@
     <footer class="footer">
         <div class="container">
             <p class="footer-text">
-                <span class="urdu">پاکستانی اشاراتی زبان شناسی نظام</span>
+                <span class="urdu">Ù¾Ø§Ú©Ø³ØªØ§Ù†ÛŒ Ø§Ø´Ø§Ø±Ø§ØªÛŒ Ø²Ø¨Ø§Ù† Ø´Ù†Ø§Ø³ÛŒ Ù†Ø¸Ø§Ù…</span>
                 <span class="divider">|</span>
                 <span class="english">Pakistan Sign Language Recognition - Browser Edition</span>
                 <span class="divider">|</span>
@@ -2052,28 +2052,28 @@
     <!-- Camera Error Modal - Enhanced -->
     <div class="camera-error-modal" id="cameraErrorModal" style="display: none;">
         <div class="camera-error-content">
-            <div class="camera-error-icon">📹</div>
+            <div class="camera-error-icon">ðŸ“¹</div>
             <h3 class="camera-error-title">Camera Access Required</h3>
             <p class="camera-error-message" id="cameraErrorMessage">
                 Please allow camera access to use sign language recognition.
             </p>
             <div class="camera-error-actions">
                 <button class="btn btn-start" id="retryCameraBtn">
-                    <span class="btn-text">🔄 Try Again</span>
+                    <span class="btn-text">ðŸ”„ Try Again</span>
                 </button>
                 <button class="btn btn-reset" id="openSettingsBtn" style="display: none;">
-                    <span class="btn-text">⚙️ Open Settings</span>
+                    <span class="btn-text">âš™ï¸ Open Settings</span>
                 </button>
             </div>
             <div class="camera-error-help">
                 <details open>
-                    <summary>📖 How to enable camera access</summary>
+                    <summary>ðŸ“– How to enable camera access</summary>
                     
                     <!-- Chrome/Edge Instructions -->
                     <div class="browser-instructions" id="chromeInstructions">
-                        <h4>🌐 Chrome / Edge</h4>
+                        <h4>ðŸŒ Chrome / Edge</h4>
                         <ol>
-                            <li>Click the <strong>🔒 lock icon</strong> in the address bar (left side)</li>
+                            <li>Click the <strong>ðŸ”’ lock icon</strong> in the address bar (left side)</li>
                             <li>Find <strong>"Camera"</strong> and select <strong>"Allow"</strong></li>
                             <li>Click <strong>"Try Again"</strong> above</li>
                         </ol>
@@ -2081,9 +2081,9 @@
                     
                     <!-- Firefox Instructions -->
                     <div class="browser-instructions" id="firefoxInstructions" style="display: none;">
-                        <h4>🦊 Firefox</h4>
+                        <h4>ðŸ¦Š Firefox</h4>
                         <ol>
-                            <li>Click the <strong>🎥 camera icon</strong> in the address bar</li>
+                            <li>Click the <strong>ðŸŽ¥ camera icon</strong> in the address bar</li>
                             <li>Select <strong>"Allow"</strong> from the dropdown</li>
                             <li>Click <strong>"Try Again"</strong> above</li>
                         </ol>
@@ -2091,9 +2091,9 @@
                     
                     <!-- Safari Instructions -->
                     <div class="browser-instructions" id="safariInstructions" style="display: none;">
-                        <h4>🧭 Safari</h4>
+                        <h4>ðŸ§­ Safari</h4>
                         <ol>
-                            <li>Go to <strong>Safari → Settings → Websites → Camera</strong></li>
+                            <li>Go to <strong>Safari â†’ Settings â†’ Websites â†’ Camera</strong></li>
                             <li>Find this website and select <strong>"Allow"</strong></li>
                             <li>Refresh the page and try again</li>
                         </ol>
@@ -2101,17 +2101,17 @@
                     
                     <!-- Mobile Instructions -->
                     <div class="browser-instructions" id="mobileInstructions" style="display: none;">
-                        <h4>📱 Mobile Browser</h4>
+                        <h4>ðŸ“± Mobile Browser</h4>
                         <ol>
                             <li>When prompted, tap <strong>"Allow"</strong></li>
-                            <li>If denied, go to your device <strong>Settings → Apps → Browser → Permissions → Camera</strong></li>
+                            <li>If denied, go to your device <strong>Settings â†’ Apps â†’ Browser â†’ Permissions â†’ Camera</strong></li>
                             <li>Enable camera access and refresh</li>
                         </ol>
                     </div>
                 </details>
                 
                 <div class="camera-error-tip">
-                    <strong>💡 Tip:</strong> If the camera still doesn't work, try refreshing the page (Ctrl+R or Cmd+R)
+                    <strong>ðŸ’¡ Tip:</strong> If the camera still doesn't work, try refreshing the page (Ctrl+R or Cmd+R)
                 </div>
             </div>
         </div>
@@ -2122,15 +2122,15 @@
         <div class="correction-modal-content">
             <div class="correction-modal-header">
                 <h3 class="correction-modal-title">
-                    <span class="urdu">صحیح اشارہ کا انتخاب کریں</span>
+                    <span class="urdu">ØµØ­ÛŒØ­ Ø§Ø´Ø§Ø±Û Ú©Ø§ Ø§Ù†ØªØ®Ø§Ø¨ Ú©Ø±ÛŒÚº</span>
                     <span class="english">Select the Correct Sign</span>
                 </h3>
-                <button class="correction-modal-close" id="closeCorrectionModal" aria-label="Close">×</button>
+                <button class="correction-modal-close" id="closeCorrectionModal" aria-label="Close">Ã—</button>
             </div>
             
             <div class="correction-modal-body">
                 <p class="correction-modal-instruction">
-                    <span class="urdu">ماڈل نے "<span id="incorrectPredictionLabel">-</span>" پیش گوئی کی۔ براہ کرم بتائیں کہ آپ نے کون سا اشارہ کیا:</span>
+                    <span class="urdu">Ù…Ø§ÚˆÙ„ Ù†Û’ "<span id="incorrectPredictionLabel">-</span>" Ù¾ÛŒØ´ Ú¯ÙˆØ¦ÛŒ Ú©ÛŒÛ” Ø¨Ø±Ø§Û Ú©Ø±Ù… Ø¨ØªØ§Ø¦ÛŒÚº Ú©Û Ø¢Ù¾ Ù†Û’ Ú©ÙˆÙ† Ø³Ø§ Ø§Ø´Ø§Ø±Û Ú©ÛŒØ§:</span>
                     <span class="english">The model predicted "<span id="incorrectPredictionLabelEn">-</span>". Please select what sign you actually performed:</span>
                 </p>
                 
@@ -2139,7 +2139,7 @@
                     <input type="text" 
                            id="signSearchInput" 
                            class="sign-search-input" 
-                           placeholder="Search signs... / اشارہ تلاش کریں"
+                           placeholder="Search signs... / Ø§Ø´Ø§Ø±Û ØªÙ„Ø§Ø´ Ú©Ø±ÛŒÚº"
                            autocomplete="off">
                     <div class="sign-list" id="signList">
                         <!-- Signs will be populated by JavaScript -->
@@ -2147,7 +2147,7 @@
                 </div>
                 
                 <div class="selected-sign-display" id="selectedSignDisplay" style="display: none;">
-                    <span class="urdu">منتخب کردہ:</span>
+                    <span class="urdu">Ù…Ù†ØªØ®Ø¨ Ú©Ø±Ø¯Û:</span>
                     <span class="english">Selected:</span>
                     <strong id="selectedSignLabel">-</strong>
                 </div>
@@ -2156,13 +2156,13 @@
             <div class="correction-modal-footer">
                 <button class="btn btn-reset" id="cancelCorrectionBtn">
                     <span class="btn-text">
-                        <span class="urdu">منسوخ کریں</span>
+                        <span class="urdu">Ù…Ù†Ø³ÙˆØ® Ú©Ø±ÛŒÚº</span>
                         <span class="english">Cancel</span>
                     </span>
                 </button>
                 <button class="btn btn-start" id="submitCorrectionBtn" disabled>
                     <span class="btn-text">
-                        <span class="urdu">جمع کروائیں</span>
+                        <span class="urdu">Ø¬Ù…Ø¹ Ú©Ø±ÙˆØ§Ø¦ÛŒÚº</span>
                         <span class="english">Submit Correction</span>
                     </span>
                 </button>
@@ -2336,7 +2336,7 @@
             </h4>
             <div class="recording-controls">
                 <button class="record-btn" id="recordToggleBtn">
-                    <span class="record-icon" id="recordIcon">⏺</span>
+                    <span class="record-icon" id="recordIcon">âº</span>
                     <span class="record-text" id="recordText">Start Recording</span>
                 </button>
                 <div class="recording-status" id="recordingStatus">
@@ -2372,7 +2372,7 @@
     <div class="practice-panel" id="practicePanel">
         <div class="practice-header">
             <h3>Practice Mode</h3>
-            <button class="practice-close" id="practiceClose">×</button>
+            <button class="practice-close" id="practiceClose">Ã—</button>
         </div>
         <div class="practice-content">
             <div class="practice-reference">
@@ -2393,7 +2393,7 @@
             <div class="practice-stats">
                 <div class="practice-stat">
                     <div class="practice-stat-value" id="practiceStreak">0</div>
-                    <div class="practice-stat-label">Streak 🔥</div>
+                    <div class="practice-stat-label">Streak ðŸ”¥</div>
                 </div>
                 <div class="practice-stat">
                     <div class="practice-stat-value" id="practiceAccuracy">0%</div>
@@ -2403,13 +2403,13 @@
             
             <div class="practice-controls">
                 <button class="practice-btn practice-btn-secondary" id="practiceSkip">
-                    ⏭️ Skip
+                    â­ï¸ Skip
                 </button>
                 <button class="practice-btn practice-btn-primary" id="practiceWeakSigns">
-                    🎯 Weak Signs
+                    ðŸŽ¯ Weak Signs
                 </button>
                 <button class="practice-btn practice-btn-secondary" id="practiceRandom">
-                    🎲 Random
+                    ðŸŽ² Random
                 </button>
             </div>
         </div>
@@ -2434,10 +2434,10 @@
     <div class="shortcuts-panel" id="shortcutsPanel">
         <div class="shortcuts-header">
             <h3>Quick Words</h3>
-            <button class="shortcuts-close" id="shortcutsClose">×</button>
+            <button class="shortcuts-close" id="shortcutsClose">Ã—</button>
         </div>
         <div class="shortcuts-search">
-            <input type="text" id="shortcutsSearch" placeholder="🔍 Search words...">
+            <input type="text" id="shortcutsSearch" placeholder="ðŸ” Search words...">
         </div>
         <div class="shortcuts-category-tabs" id="shortcutsCategoryTabs">
             <!-- Tabs injected dynamically -->
@@ -2446,7 +2446,7 @@
             <!-- Word buttons injected dynamically -->
         </div>
         <button class="shortcuts-add-custom" id="shortcutsAddCustom">
-            ➕ Add Custom Word
+            âž• Add Custom Word
         </button>
     </div>
 
@@ -2456,7 +2456,7 @@
             <h4>Add Custom Word</h4>
             <div class="custom-modal-field">
                 <label for="customUrduInput">Urdu Word</label>
-                <input type="text" id="customUrduInput" placeholder="اردو لفظ" dir="rtl">
+                <input type="text" id="customUrduInput" placeholder="Ø§Ø±Ø¯Ùˆ Ù„ÙØ¸" dir="rtl">
             </div>
             <div class="custom-modal-field">
                 <label for="customRomanizedInput">Romanized (Optional)</label>
@@ -2477,7 +2477,7 @@
         <div class="loading-content">
             <div class="loading-spinner"></div>
             <p class="loading-title">
-                <span class="urdu">لوڈ ہو رہا ہے...</span>
+                <span class="urdu">Ù„ÙˆÚˆ ÛÙˆ Ø±ÛØ§ ÛÛ’...</span>
                 <span class="english">Initializing Browser Mode</span>
             </p>
             <p class="loading-subtitle" id="loadingProgress">
@@ -2491,27 +2491,27 @@
 
     <!-- JavaScript - Browser-Only Version -->
     <!-- Core camera with MediaPipe -->
-    <script src="js/camera.js"></script>
+    <script src="frontend/js/camera.js"></script>
     
     <!-- Visualization -->
-    <script src="js/visualization.js"></script>
-    <script src="js/ui.js"></script>
+    <script src="frontend/js/visualization.js"></script>
+    <script src="frontend/js/ui.js"></script>
     
     <!-- Browser-Only Components (NO WebSocket needed) -->
-    <script src="js/onnx_predictor.js"></script>
-    <script src="js/firebase_config.js"></script>
-    <script src="js/cloud_sync.js"></script>
-    <script src="js/feedback_manager.js"></script>
-    <script src="js/word_formation.js"></script>
-    <script src="js/analytics.js"></script>
+    <script src="frontend/js/onnx_predictor.js"></script>
+    <script src="frontend/js/firebase_config.js"></script>
+    <script src="frontend/js/cloud_sync.js"></script>
+    <script src="frontend/js/feedback_manager.js"></script>
+    <script src="frontend/js/word_formation.js"></script>
+    <script src="frontend/js/analytics.js"></script>
     
     <!-- Innovation Modules -->
-    <script src="js/practice-mode.js"></script>
-    <script src="js/disambiguation.js"></script>
-    <script src="js/word-shortcuts.js"></script>
-    <script src="js/pip-mode.js"></script>
+    <script src="frontend/js/practice-mode.js"></script>
+    <script src="frontend/js/disambiguation.js"></script>
+    <script src="frontend/js/word-shortcuts.js"></script>
+    <script src="frontend/js/pip-mode.js"></script>
     
-    <script src="js/app_browser.js"></script>
+    <script src="frontend/js/app_browser.js"></script>
     
     <!-- Initialize App -->
     <script>
@@ -2533,7 +2533,7 @@
         // Register Service Worker for offline capability
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
+                navigator.serviceWorker.register('frontend/sw.js')
                     .then((registration) => {
                         console.log('[PWA] Service Worker registered:', registration.scope);
                         
@@ -2561,4 +2561,5 @@
     </script>
 </body>
 </html>
+
 

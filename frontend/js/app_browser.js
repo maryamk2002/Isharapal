@@ -55,6 +55,18 @@ class PSLRecognitionApp {
             qualityIssues: 0
         };
         
+        // CRITICAL FIX: Adaptive FPS for slow devices
+        this.adaptiveFPS = {
+            enabled: true,
+            minFPS: 10,
+            maxFPS: 18,
+            currentFPS: 18,
+            slowFrameCount: 0,
+            slowFrameThreshold: 10,  // Reduce FPS after 10 slow frames
+            lastAdjustTime: 0,
+            adjustCooldownMs: 5000   // Don't adjust more than every 5s
+        };
+        
         // Components
         this.camera = null;
         this.predictor = null;  // ONNXPredictor (replaces WebSocket)
@@ -571,11 +583,19 @@ class PSLRecognitionApp {
         // Keyboard shortcuts
         this.setupKeyboardShortcuts();
         
-        // Window resize
+        // Window resize - OPTIMIZED: Debounced to prevent excessive calls
+        let resizeTimeout = null;
         window.addEventListener('resize', () => {
-            if (this.visualizer) {
-                this.visualizer.handleResize();
+            // Clear previous timeout
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
             }
+            // Debounce: Only handle resize after 150ms of no resize events
+            resizeTimeout = setTimeout(() => {
+                if (this.visualizer) {
+                    this.visualizer.handleResize();
+                }
+            }, 150);
         });
         
         // Word Formation buttons
@@ -619,6 +639,30 @@ class PSLRecognitionApp {
         if (this.elements.clearLettersBtn) {
             this.elements.clearLettersBtn.addEventListener('click', () => {
                 this.clearLetterHistory();
+            });
+        }
+        
+        // CRITICAL FIX: Event delegation for history items (prevents memory leak)
+        if (this.elements.historyList) {
+            this.elements.historyList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.history-fb-btn');
+                if (!btn) return;
+                e.stopPropagation();
+                const itemId = btn.dataset.id;
+                const isCorrect = btn.classList.contains('history-fb-correct');
+                this.handleHistoryFeedback(itemId, isCorrect);
+            });
+        }
+        
+        // CRITICAL FIX: Event delegation for letter history (prevents memory leak)
+        if (this.elements.letterHistoryList) {
+            this.elements.letterHistoryList.addEventListener('click', (e) => {
+                const btn = e.target.closest('.letter-fb-btn');
+                if (!btn) return;
+                e.stopPropagation();
+                const letterId = btn.dataset.id;
+                const isCorrect = btn.classList.contains('letter-fb-correct');
+                this.handleLetterFeedback(letterId, isCorrect);
             });
         }
         
@@ -930,6 +974,11 @@ class PSLRecognitionApp {
             // Start prediction loop
             this.startPredictionLoop();
             
+            // PERFORMANCE FIX: Start visualizer animation only when recognition is active
+            if (this.visualizer && !this.visualizer.isActive) {
+                this.visualizer.startAnimation();
+            }
+            
             // FIXED: Restart word formation pause detection when recognition starts
             if (this.wordFormation) {
                 this.wordFormation.startPauseDetection();
@@ -979,10 +1028,12 @@ class PSLRecognitionApp {
             this.lastDisplayedPrediction = null;
             this.lastDisplayedConfidence = 0;
             
-            // Clear visualizer
+            // Clear and STOP visualizer to save CPU
             if (this.visualizer) {
                 this.visualizer.updateKeypoints(null);
                 this.visualizer.clear();
+                // PERFORMANCE FIX: Stop animation loop when not recognizing
+                this.visualizer.stopAnimation();
             }
             
             // FIXED: Stop word formation pause detection to save resources
@@ -1112,32 +1163,48 @@ class PSLRecognitionApp {
     
     /**
      * Start the prediction loop (OPTIMIZED: adaptive rate based on buffer state)
-     * PERFORMANCE FIX: Reduced frequency and smart skipping to eliminate lag
+     * PERFORMANCE FIX: Uses setTimeout for proper async timing instead of rAF
+     * This prevents main thread blocking and allows proper inference pacing
      */
     startPredictionLoop() {
         this.stopPredictionLoop();  // Clear any existing
         
-        // PERFORMANCE FIX: Track last buffer size to skip redundant predictions
+        // PERFORMANCE FIX: Track state for smart skipping
         this._lastBufferSize = 0;
         this._lastPredictionTime = 0;
         this._consecutiveSkips = 0;
+        this._predictionLoopRunning = true;
         
-        // Use requestAnimationFrame for smoother, non-blocking execution
+        // Use setTimeout-based loop for proper async pacing (NOT rAF)
+        // This prevents prediction calls from blocking the main thread
         const runPredictionCycle = async () => {
-            if (!this.isRecognitionActive) {
+            if (!this.isRecognitionActive || !this._predictionLoopRunning) {
+                return;
+            }
+            
+            // CRITICAL FIX: Skip inference when tab is hidden (browser throttles anyway)
+            if (document.hidden) {
+                // Schedule slower check when hidden
+                this.predictionLoopTimeout = setTimeout(runPredictionCycle, 500);
                 return;
             }
             
             const now = performance.now();
             
-            // PERFORMANCE FIX: Adaptive interval - slower when collecting, faster when ready
-            const bufferSize = this.predictor?.frameBuffer?.length || 0;
-            const minFrames = this.predictor?.config?.minPredictionFrames || 12;
+            // STABILITY FIX: Guard against null predictor
+            if (!this.predictor || !this.predictor.isReady) {
+                this.predictionLoopTimeout = setTimeout(runPredictionCycle, 200);
+                return;
+            }
             
-            // Calculate adaptive interval:
-            // - 150ms when buffer is < 50% full (collecting frames)
-            // - 100ms when buffer is 50-80% full (almost ready)
-            // - 83ms when buffer is ready (fast predictions)
+            // Calculate adaptive interval based on buffer state
+            const bufferSize = this.predictor.frameBuffer?.length || 0;
+            const minFrames = this.predictor.config?.minPredictionFrames || 12;
+            
+            // Adaptive interval:
+            // - 150ms when collecting (buffer < 50%)
+            // - 100ms when almost ready (buffer 50-100%)
+            // - 83ms when ready for predictions
             let targetInterval = 150;
             if (bufferSize >= minFrames) {
                 targetInterval = 83;  // Ready for predictions
@@ -1145,20 +1212,15 @@ class PSLRecognitionApp {
                 targetInterval = 100; // Getting close
             }
             
-            // PERFORMANCE FIX: Skip if not enough time has passed
-            if (now - this._lastPredictionTime < targetInterval) {
-                this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
-                return;
-            }
-            
-            // PERFORMANCE FIX: Skip prediction if buffer hasn't changed (no new frames)
+            // Skip prediction if buffer hasn't changed and not ready
             if (bufferSize === this._lastBufferSize && bufferSize < minFrames) {
                 this._consecutiveSkips++;
                 // Only update UI occasionally when skipping
                 if (this._consecutiveSkips % 5 === 0) {
                     this.updateBufferStatus(bufferSize, this.predictor.config.slidingWindowSize);
                 }
-                this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+                // Schedule next cycle with setTimeout (non-blocking)
+                this.predictionLoopTimeout = setTimeout(runPredictionCycle, targetInterval);
                 return;
             }
             
@@ -1171,9 +1233,19 @@ class PSLRecognitionApp {
                 const result = await this.predictor.predict(true);
                 const predTime = performance.now() - startTime;
                 
+                // Handle inference_busy status (overlapping call prevented)
+                if (result.status === 'inference_busy') {
+                    // Retry sooner since inference is still running
+                    this.predictionLoopTimeout = setTimeout(runPredictionCycle, 50);
+                    return;
+                }
+                
                 // Track prediction performance
                 this.performanceMetrics.avgPredictionTime = 
                     this.performanceMetrics.avgPredictionTime * 0.9 + predTime * 0.1;
+                
+                // CRITICAL: Adaptive FPS for slow devices
+                this.checkAdaptiveFPS(predTime);
                 
                 this.handlePredictionResult(result);
                 
@@ -1181,28 +1253,105 @@ class PSLRecognitionApp {
                 console.error('Prediction loop error:', error);
             }
             
-            // Schedule next cycle
-            this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+            // Schedule next cycle with setTimeout (allows main thread to breathe)
+            if (this._predictionLoopRunning) {
+                this.predictionLoopTimeout = setTimeout(runPredictionCycle, targetInterval);
+            }
         };
         
-        // Start the loop
-        this.predictionLoopInterval = requestAnimationFrame(runPredictionCycle);
+        // Start the loop with setTimeout
+        this.predictionLoopTimeout = setTimeout(runPredictionCycle, 50);
         
-        console.log('[PERF] Prediction loop started with adaptive rate (83-150ms)');
+        console.log('[PERF] Prediction loop started with adaptive rate (83-150ms, setTimeout-based)');
     }
     
     /**
      * Stop the prediction loop
      */
     stopPredictionLoop() {
+        // Mark loop as stopped first
+        this._predictionLoopRunning = false;
+        
+        // Clear timeout-based loop
+        if (this.predictionLoopTimeout) {
+            clearTimeout(this.predictionLoopTimeout);
+            this.predictionLoopTimeout = null;
+        }
+        
+        // Legacy: Clear rAF-based loop if exists
         if (this.predictionLoopInterval) {
             cancelAnimationFrame(this.predictionLoopInterval);
             this.predictionLoopInterval = null;
         }
+        
         // Reset tracking variables
         this._lastBufferSize = 0;
         this._lastPredictionTime = 0;
         this._consecutiveSkips = 0;
+    }
+    
+    /**
+     * CRITICAL: Check if device is struggling and adapt FPS accordingly
+     * This prevents lag and freezes on low-end laptops
+     */
+    checkAdaptiveFPS(predictionTimeMs) {
+        if (!this.adaptiveFPS.enabled) return;
+        
+        const now = Date.now();
+        
+        // A frame is "slow" if prediction takes > 150ms (should be <100ms ideally)
+        const isSlowFrame = predictionTimeMs > 150;
+        
+        if (isSlowFrame) {
+            this.adaptiveFPS.slowFrameCount++;
+        } else {
+            // Decay slow frame count over time
+            this.adaptiveFPS.slowFrameCount = Math.max(0, this.adaptiveFPS.slowFrameCount - 0.5);
+        }
+        
+        // Check if we should adjust FPS (with cooldown)
+        if (now - this.adaptiveFPS.lastAdjustTime < this.adaptiveFPS.adjustCooldownMs) {
+            return;
+        }
+        
+        // Too many slow frames -> reduce FPS
+        if (this.adaptiveFPS.slowFrameCount >= this.adaptiveFPS.slowFrameThreshold) {
+            const newFPS = Math.max(this.adaptiveFPS.minFPS, this.adaptiveFPS.currentFPS - 2);
+            if (newFPS !== this.adaptiveFPS.currentFPS) {
+                console.warn(`[ADAPTIVE] Device struggling - reducing FPS: ${this.adaptiveFPS.currentFPS} -> ${newFPS}`);
+                this.adaptiveFPS.currentFPS = newFPS;
+                this.settings.frameRate = newFPS;
+                this.frameIntervalMs = 1000 / newFPS;
+                
+                // Update camera frame rate too
+                if (this.camera) {
+                    this.camera.frameRate = newFPS;
+                }
+                
+                this.adaptiveFPS.lastAdjustTime = now;
+                this.adaptiveFPS.slowFrameCount = 0;
+                
+                this.showNotification(`Performance mode: ${newFPS} FPS`, 'warning');
+            }
+        }
+        // Performing well -> try to increase FPS (gradual)
+        else if (this.adaptiveFPS.slowFrameCount === 0 && 
+                 this.adaptiveFPS.currentFPS < this.adaptiveFPS.maxFPS &&
+                 predictionTimeMs < 80) {
+            const newFPS = Math.min(this.adaptiveFPS.maxFPS, this.adaptiveFPS.currentFPS + 1);
+            if (newFPS !== this.adaptiveFPS.currentFPS) {
+                console.log(`[ADAPTIVE] Performance good - increasing FPS: ${this.adaptiveFPS.currentFPS} -> ${newFPS}`);
+                this.adaptiveFPS.currentFPS = newFPS;
+                this.settings.frameRate = newFPS;
+                this.frameIntervalMs = 1000 / newFPS;
+                
+                if (this.camera) {
+                    this.camera.frameRate = newFPS;
+                }
+                
+                this.adaptiveFPS.lastAdjustTime = now;
+            }
+        }
     }
     
     /**
@@ -1216,7 +1365,10 @@ class PSLRecognitionApp {
         }
         
         // IMPROVED: More informative status messages
-        if (result.status === 'collecting_frames') {
+        if (result.status === 'inference_busy') {
+            // Inference is still running - skip update, don't change UI
+            return;
+        } else if (result.status === 'collecting_frames') {
             const progress = Math.round((result.bufferSize / result.minRequired) * 100);
             this.updateSystemStatus(`Collecting... ${progress}%`);
         } else if (result.status === 'low_confidence') {
@@ -1650,18 +1802,19 @@ class PSLRecognitionApp {
         const itemId = `history-${++this.historyIdCounter}`;
         
         // Store prediction data for later feedback
+        // MEMORY FIX: Don't store landmarks - they're ~27KB per item and rarely used
         const historyData = {
             id: itemId,
             label: prediction.label,
             confidence: prediction.confidence,
             timestamp: Date.now(),
-            landmarks: this.currentLandmarkSequence ? [...this.currentLandmarkSequence] : null,
+            landmarks: null,  // MEMORY: Removed landmark storage (saves ~27KB per item)
             feedbackGiven: false
         };
         this.historyItems.unshift(historyData);
         
-        // Keep only last 20 items in memory
-        if (this.historyItems.length > 20) {
+        // MEMORY FIX: Keep only last 10 items in memory (reduced from 15)
+        while (this.historyItems.length > 10) {
             this.historyItems.pop();
         }
         
@@ -1693,19 +1846,7 @@ class PSLRecognitionApp {
             </div>
         `;
         
-        // Add click handlers for feedback buttons
-        const correctBtn = historyItem.querySelector('.history-fb-correct');
-        const incorrectBtn = historyItem.querySelector('.history-fb-incorrect');
-        
-        correctBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.handleHistoryFeedback(itemId, true);
-        });
-        
-        incorrectBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.handleHistoryFeedback(itemId, false);
-        });
+        // NOTE: Event handlers use delegation (setupEventListeners) - no individual listeners needed
         
         // Add to top of list
         this.elements.historyList.insertBefore(historyItem, this.elements.historyList.firstChild);
@@ -1914,19 +2055,20 @@ class PSLRecognitionApp {
         const letterId = `letter-${++this.letterIdCounter}`;
         
         // Store letter data
+        // MEMORY FIX: Don't store full landmark sequences (large arrays) - save memory
         const letterRecord = {
             id: letterId,
             urduChar: letterData.urduChar,
             romanized: letterData.romanized,
             confidence: letterData.confidence,
             timestamp: Date.now(),
-            landmarks: this.currentLandmarkSequence ? [...this.currentLandmarkSequence] : null,
+            landmarks: null,  // MEMORY: Removed landmark storage - too large
             feedbackGiven: false
         };
         this.letterHistory.push(letterRecord);
         
-        // Keep only last 30 letters in memory
-        if (this.letterHistory.length > 30) {
+        // MEMORY FIX: Keep only last 20 letters in memory (reduced from 30)
+        while (this.letterHistory.length > 20) {
             const oldest = this.letterHistory.shift();
             const oldElement = document.getElementById(oldest.id);
             if (oldElement) oldElement.remove();
@@ -1950,19 +2092,7 @@ class PSLRecognitionApp {
             </div>
         `;
         
-        // Add click handlers for feedback buttons
-        const correctBtn = letterItem.querySelector('.letter-fb-correct');
-        const incorrectBtn = letterItem.querySelector('.letter-fb-incorrect');
-        
-        correctBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.handleLetterFeedback(letterId, true);
-        });
-        
-        incorrectBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.handleLetterFeedback(letterId, false);
-        });
+        // NOTE: Event handlers use delegation (setupEventListeners) - no individual listeners needed
         
         // Add to the list (at the end for RTL display order)
         this.elements.letterHistoryList.appendChild(letterItem);
@@ -2043,6 +2173,13 @@ class PSLRecognitionApp {
     }
     
     updateBufferStatus(current, target) {
+        // PERFORMANCE: Throttle buffer status updates (max 5 per second)
+        const now = Date.now();
+        if (this._lastBufferUIUpdate && now - this._lastBufferUIUpdate < 200) {
+            return; // Skip this update
+        }
+        this._lastBufferUIUpdate = now;
+        
         if (this.ui) {
             this.ui.updateBuffer(current, target);
         }
@@ -2129,16 +2266,28 @@ class PSLRecognitionApp {
     
     /**
      * Save user preferences to localStorage
+     * STABILITY FIX: Added quota protection
      */
     saveUserPreferences() {
         try {
-            localStorage.setItem('psl_user_preferences', JSON.stringify({
+            const data = JSON.stringify({
                 soundEnabled: this.settings.soundEnabled,
                 ttsEnabled: this.settings.ttsEnabled,
                 darkMode: this.settings.darkMode
-            }));
+            });
+            localStorage.setItem('psl_user_preferences', data);
         } catch (e) {
             console.warn('Could not save user preferences:', e);
+            // Handle quota exceeded
+            if (e.name === 'QuotaExceededError') {
+                console.warn('LocalStorage full - attempting cleanup');
+                try {
+                    localStorage.removeItem('psl_feedback_history');
+                    localStorage.removeItem('psl_session_data');
+                } catch (cleanupErr) {
+                    // Ignore cleanup errors
+                }
+            }
         }
     }
     
@@ -2633,11 +2782,12 @@ class PSLRecognitionApp {
     
     /**
      * Update performance metrics UI
+     * OPTIMIZED: Throttled DOM updates to reduce layout thrashing
      */
     updatePerformanceMetrics(inferenceTime = null, mediapipeTime = null) {
         if (!this.performanceMetrics) return;
         
-        // Record frame for FPS
+        // Record frame for FPS (always record internally)
         this.performanceMetrics.recordFrame();
         
         // Record timing data
@@ -2648,28 +2798,37 @@ class PSLRecognitionApp {
             this.performanceMetrics.recordMediapipeTime(mediapipeTime);
         }
         
-        // Update UI elements
-        if (this.elements.perfFps) {
-            const fps = this.performanceMetrics.fps;
-            this.elements.perfFps.textContent = fps;
-            this.elements.perfFps.className = `perf-value ${this.performanceMetrics.getFpsClass()}`;
+        // PERFORMANCE: Throttle DOM updates to max 4 per second (250ms)
+        const now = Date.now();
+        if (!this._lastPerfUIUpdate || now - this._lastPerfUIUpdate >= 250) {
+            this._lastPerfUIUpdate = now;
+            
+            // Update UI elements (batched)
+            if (this.elements.perfFps) {
+                const fps = this.performanceMetrics.fps;
+                this.elements.perfFps.textContent = fps;
+                this.elements.perfFps.className = `perf-value ${this.performanceMetrics.getFpsClass()}`;
+            }
+            
+            if (this.elements.perfInference) {
+                this.elements.perfInference.textContent = `${Math.round(this.performanceMetrics.currentInferenceTime)}ms`;
+                this.elements.perfInference.className = `perf-value ${this.performanceMetrics.getInferenceClass()}`;
+            }
+            
+            if (this.elements.perfMediapipe) {
+                this.elements.perfMediapipe.textContent = `${Math.round(this.performanceMetrics.currentMediapipeTime)}ms`;
+            }
+            
+            if (this.elements.perfMemory) {
+                this.elements.perfMemory.textContent = this.performanceMetrics.getMemoryUsage();
+            }
+            
+            // Update chart (less frequently - every 500ms)
+            if (!this._lastChartUpdate || now - this._lastChartUpdate >= 500) {
+                this._lastChartUpdate = now;
+                this.performanceMetrics.renderChart();
+            }
         }
-        
-        if (this.elements.perfInference) {
-            this.elements.perfInference.textContent = `${Math.round(this.performanceMetrics.currentInferenceTime)}ms`;
-            this.elements.perfInference.className = `perf-value ${this.performanceMetrics.getInferenceClass()}`;
-        }
-        
-        if (this.elements.perfMediapipe) {
-            this.elements.perfMediapipe.textContent = `${Math.round(this.performanceMetrics.currentMediapipeTime)}ms`;
-        }
-        
-        if (this.elements.perfMemory) {
-            this.elements.perfMemory.textContent = this.performanceMetrics.getMemoryUsage();
-        }
-        
-        // Update chart
-        this.performanceMetrics.renderChart();
     }
     
     /**

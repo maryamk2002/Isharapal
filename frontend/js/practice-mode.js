@@ -281,8 +281,14 @@ class PracticeMode {
     /**
      * Start hold timer for sign recognition
      * FIXED: Uses requestAnimationFrame for smoother animation and better battery efficiency
+     * FIXED: Added race condition guard to prevent multiple concurrent timers
      */
     startHoldTimer() {
+        // RACE CONDITION FIX: Don't start if already running
+        if (this.holdTimerActive && this.holdStartTime) {
+            return; // Timer already running, don't start another
+        }
+        
         this.holdStartTime = Date.now();
         this.holdTimerActive = true;
         
