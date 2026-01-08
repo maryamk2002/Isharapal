@@ -1319,6 +1319,83 @@
             background: linear-gradient(135deg, #4a5568, #5a6678) !important;
         }
         
+        /* Dark mode: Control Panel & Video Card */
+        [data-theme="dark"] .control-panel {
+            background: var(--zen-card-bg) !important;
+            border-top: 1px solid var(--zen-card-border);
+        }
+        
+        [data-theme="dark"] .video-card {
+            background: var(--zen-card-bg) !important;
+            border-color: var(--zen-card-border) !important;
+        }
+        
+        [data-theme="dark"] .video-container {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        [data-theme="dark"] .stats-bar {
+            background: var(--zen-card-bg) !important;
+            border-color: var(--zen-card-border) !important;
+        }
+        
+        [data-theme="dark"] .prediction-card {
+            background: var(--zen-card-bg) !important;
+            border-color: var(--zen-card-border) !important;
+        }
+        
+        [data-theme="dark"] .sentence-card {
+            background: rgba(77, 182, 172, 0.08) !important;
+            border-color: rgba(77, 182, 172, 0.2) !important;
+        }
+        
+        [data-theme="dark"] .history-card {
+            background: var(--zen-card-bg) !important;
+            border-color: var(--zen-card-border) !important;
+        }
+        
+        /* Dark mode: Buttons - ensure visible */
+        [data-theme="dark"] .btn-start {
+            background: linear-gradient(135deg, var(--ip-green) 0%, var(--ip-teal) 100%) !important;
+        }
+        
+        [data-theme="dark"] .btn-stop {
+            background: linear-gradient(135deg, #f85149, #da3633) !important;
+        }
+        
+        /* Dark mode: Feedback buttons - more visible borders */
+        [data-theme="dark"] .feedback-correct {
+            background: rgba(122, 193, 66, 0.15) !important;
+            border: 2px solid var(--zen-success) !important;
+            color: var(--zen-success) !important;
+        }
+        
+        [data-theme="dark"] .feedback-correct:hover {
+            background: var(--zen-success) !important;
+            color: white !important;
+        }
+        
+        [data-theme="dark"] .feedback-incorrect {
+            background: rgba(248, 81, 73, 0.15) !important;
+            border: 2px solid var(--zen-error) !important;
+            color: var(--zen-error) !important;
+        }
+        
+        [data-theme="dark"] .feedback-incorrect:hover {
+            background: var(--zen-error) !important;
+            color: white !important;
+        }
+        
+        /* Dark mode: Feedback section */
+        [data-theme="dark"] .feedback-section {
+            background: rgba(77, 182, 172, 0.05);
+            border-top: 1px solid var(--zen-card-border);
+        }
+        
+        [data-theme="dark"] .feedback-header {
+            color: var(--zen-text-muted);
+        }
+        
         /* Dark mode Urdu text emphasis */
         [data-theme="dark"] .urdu {
             color: var(--zen-text);
@@ -1341,9 +1418,9 @@
         }
         
         .logo-image {
-            height: 38px;
+            height: 52px;
             width: auto;
-            max-width: 180px;
+            max-width: 220px;
             object-fit: contain;
             display: block;
         }
@@ -1357,15 +1434,15 @@
         /* Responsive logo sizing */
         @media (max-width: 768px) {
             .logo-image {
-                height: 32px;
-                max-width: 150px;
+                height: 42px;
+                max-width: 180px;
             }
         }
         
         @media (max-width: 480px) {
             .logo-image {
-                height: 28px;
-                max-width: 130px;
+                height: 36px;
+                max-width: 150px;
             }
         }
         

@@ -700,9 +700,13 @@ class PSLRecognitionApp {
         
         if (analyticsToggle) {
             analyticsToggle.addEventListener('click', () => {
+                console.log('[Analytics] Toggle clicked, panel exists:', !!this.analyticsPanel);
                 if (this.analyticsPanel) {
                     this.analyticsPanel.toggle();
                     analyticsToggle.classList.toggle('active', this.analyticsPanel.isVisible);
+                    console.log('[Analytics] Panel visible:', this.analyticsPanel.isVisible);
+                } else {
+                    console.warn('[Analytics] Panel not initialized - check for errors above');
                 }
             });
         }
@@ -833,9 +837,13 @@ class PSLRecognitionApp {
         
         if (shortcutsToggle) {
             shortcutsToggle.addEventListener('click', () => {
+                console.log('[WordShortcuts] Toggle clicked, module exists:', !!this.wordShortcuts);
                 if (this.wordShortcuts) {
                     this.wordShortcuts.toggle();
                     shortcutsToggle.classList.toggle('active', this.wordShortcuts.isVisible);
+                    console.log('[WordShortcuts] Panel visible:', this.wordShortcuts.isVisible);
+                } else {
+                    console.warn('[WordShortcuts] Module not initialized - check for errors above');
                 }
             });
         }
