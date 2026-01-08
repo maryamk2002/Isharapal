@@ -177,18 +177,37 @@ class ONNXPredictor {
             }
             
             // Configure ONNX Runtime with optimizations
+            // FIX: Explicitly use only WASM to avoid JS provider errors on older Intel GPUs
             const sessionOptions = {
-                executionProviders: executionProviders,
+                executionProviders: ['wasm'],  // Force WASM only - most compatible
                 graphOptimizationLevel: 'all',
                 enableCpuMemArena: true,
                 enableMemPattern: true,
-                // NEW: Additional optimizations
-                executionMode: 'sequential',  // Better for single predictions
-                logSeverityLevel: 3,  // Warnings only
+                executionMode: 'sequential',
+                logSeverityLevel: 3,
             };
             
-            // Create inference session
-            this.session = await ort.InferenceSession.create(modelPath, sessionOptions);
+            // Try WebGPU only if explicitly available and not on problematic hardware
+            if (backendUsed === 'webgpu') {
+                try {
+                    sessionOptions.executionProviders = ['webgpu', 'wasm'];
+                } catch (e) {
+                    console.warn('[ONNXPredictor] WebGPU setup failed, using WASM only');
+                    sessionOptions.executionProviders = ['wasm'];
+                    backendUsed = 'wasm';
+                }
+            }
+            
+            // Create inference session with fallback
+            try {
+                this.session = await ort.InferenceSession.create(modelPath, sessionOptions);
+            } catch (sessionError) {
+                // FIX: If first attempt fails (e.g., JS provider error), force pure WASM
+                console.warn('[ONNXPredictor] Session creation failed, retrying with WASM only:', sessionError.message);
+                sessionOptions.executionProviders = ['wasm'];
+                backendUsed = 'wasm';
+                this.session = await ort.InferenceSession.create(modelPath, sessionOptions);
+            }
             this.backendUsed = backendUsed;
             console.log(`[ONNXPredictor] ONNX model loaded successfully (backend: ${backendUsed})`);
             
