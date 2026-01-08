@@ -694,33 +694,12 @@ class PSLRecognitionApp {
             });
         }
         
-        // Analytics Toggle
+        // Analytics Toggle - NOTE: analytics.js handles its own toggle listener
+        // We just need to sync the button active state when panel visibility changes
         const analyticsToggle = document.getElementById('analyticsToggle');
-        const analyticsClose = document.getElementById('analyticsClose');
         
-        if (analyticsToggle) {
-            analyticsToggle.addEventListener('click', () => {
-                console.log('[Analytics] Toggle clicked, panel exists:', !!this.analyticsPanel);
-                if (this.analyticsPanel) {
-                    this.analyticsPanel.toggle();
-                    analyticsToggle.classList.toggle('active', this.analyticsPanel.isVisible);
-                    console.log('[Analytics] Panel visible:', this.analyticsPanel.isVisible);
-                } else {
-                    console.warn('[Analytics] Panel not initialized - check for errors above');
-                }
-            });
-        }
-        
-        if (analyticsClose) {
-            analyticsClose.addEventListener('click', () => {
-                if (this.analyticsPanel) {
-                    this.analyticsPanel.hide();
-                    if (analyticsToggle) {
-                        analyticsToggle.classList.remove('active');
-                    }
-                }
-            });
-        }
+        // The analytics panel already sets up its own toggle listener in analytics.js
+        // No duplicate listener needed here - that was causing double-toggle bug!
         
         // Innovation Module Toggles
         this.setupInnovationListeners();
@@ -831,31 +810,8 @@ class PSLRecognitionApp {
             });
         }
         
-        // Word Shortcuts Toggle
-        const shortcutsToggle = document.getElementById('shortcutsToggle');
-        const shortcutsClose = document.getElementById('shortcutsClose');
-        
-        if (shortcutsToggle) {
-            shortcutsToggle.addEventListener('click', () => {
-                console.log('[WordShortcuts] Toggle clicked, module exists:', !!this.wordShortcuts);
-                if (this.wordShortcuts) {
-                    this.wordShortcuts.toggle();
-                    shortcutsToggle.classList.toggle('active', this.wordShortcuts.isVisible);
-                    console.log('[WordShortcuts] Panel visible:', this.wordShortcuts.isVisible);
-                } else {
-                    console.warn('[WordShortcuts] Module not initialized - check for errors above');
-                }
-            });
-        }
-        
-        if (shortcutsClose) {
-            shortcutsClose.addEventListener('click', () => {
-                if (this.wordShortcuts) {
-                    this.wordShortcuts.hide();
-                    if (shortcutsToggle) shortcutsToggle.classList.remove('active');
-                }
-            });
-        }
+        // Word Shortcuts Toggle - NOTE: word-shortcuts.js handles its own toggle listener
+        // No duplicate listener needed here - that was causing double-toggle bug!
         
         // PiP Mode Toggle
         const pipToggle = document.getElementById('pipToggle');
