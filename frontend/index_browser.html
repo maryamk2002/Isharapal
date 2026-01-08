@@ -18,6 +18,8 @@
     <!-- CSS -->
     <link rel="stylesheet" href="css/urdu-fonts.css">
     <link rel="stylesheet" href="css/main_v2.css">
+    <link rel="stylesheet" href="css/analytics.css">
+    <link rel="stylesheet" href="css/innovations.css">
     
     <!-- MediaPipe Hands -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -40,7 +42,7 @@
            Calm, meditative, floating cards
            ========================================== */
         
-        /* Zen Color Palette */
+        /* Zen Color Palette - Light Mode */
         :root {
             --zen-bg-start: #f5f7fa;
             --zen-bg-end: #e8f4f0;
@@ -56,6 +58,88 @@
             --zen-success: #68a895;
             --zen-error: #c97878;
             --zen-glow: 0 0 40px rgba(90, 154, 138, 0.15);
+        }
+        
+        /* Dark Mode Theme */
+        [data-theme="dark"] {
+            --zen-bg-start: #0f1419;
+            --zen-bg-end: #1a2027;
+            --zen-card-bg: rgba(30, 40, 50, 0.9);
+            --zen-card-border: rgba(60, 80, 100, 0.4);
+            --zen-accent: #4ecdc4;
+            --zen-accent-light: #7ee8e0;
+            --zen-accent-soft: rgba(78, 205, 196, 0.15);
+            --zen-text: #e8eef4;
+            --zen-text-muted: #8899aa;
+            --zen-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --zen-shadow-hover: 0 12px 40px rgba(78, 205, 196, 0.2);
+            --zen-success: #4ecdc4;
+            --zen-error: #ff6b6b;
+            --zen-glow: 0 0 40px rgba(78, 205, 196, 0.2);
+        }
+        
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, var(--zen-bg-start) 0%, var(--zen-bg-end) 50%, #151c24 100%) !important;
+        }
+        
+        [data-theme="dark"] body::before {
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(78, 205, 196, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(100, 220, 210, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.3) 0%, transparent 70%);
+        }
+        
+        [data-theme="dark"] .browser-mode-banner {
+            background: linear-gradient(135deg, #2a3f50, #1a2830);
+        }
+        
+        [data-theme="dark"] .video-wrapper video,
+        [data-theme="dark"] .video-wrapper canvas {
+            border-color: var(--zen-accent);
+        }
+        
+        /* Header Toggle Buttons */
+        .header-toggles {
+            display: flex;
+            gap: 8px;
+            margin-right: 12px;
+        }
+        
+        .toggle-btn {
+            background: var(--zen-accent-soft);
+            border: 1px solid var(--zen-card-border);
+            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.1rem;
+        }
+        
+        .toggle-btn:hover {
+            background: var(--zen-accent);
+            transform: scale(1.05);
+        }
+        
+        .toggle-btn.active {
+            background: var(--zen-accent);
+            box-shadow: 0 0 12px var(--zen-accent);
+        }
+        
+        .toggle-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .toggle-icon {
+            line-height: 1;
+        }
+        
+        /* Disabled toggle state */
+        .toggle-btn.disabled {
+            opacity: 0.5;
         }
         
         /* Zen Background - Calm gradient with subtle pattern */
@@ -172,6 +256,99 @@
         
         .video-wrapper {
             border-radius: 12px !important;
+            position: relative;
+        }
+        
+        /* MediaPipe & Model Error Overlays */
+        .mediapipe-error-overlay,
+        .model-status-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            border-radius: 12px;
+            backdrop-filter: blur(4px);
+        }
+        
+        .error-content,
+        .model-status-content {
+            text-align: center;
+            color: white;
+            padding: 24px;
+        }
+        
+        .error-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            animation: pulse 2s infinite;
+        }
+        
+        .error-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--zen-error);
+        }
+        
+        .error-message {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 16px;
+            max-width: 250px;
+        }
+        
+        .error-retry-btn {
+            background: var(--zen-accent);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .error-retry-btn:hover {
+            background: var(--zen-accent-light);
+            transform: scale(1.05);
+        }
+        
+        .model-status-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-top-color: var(--zen-accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        .model-status-text {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+        
+        .model-status-progress {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         
         /* Zen Buttons */
@@ -1104,6 +1281,26 @@
                 text-align: center;
             }
             
+            .header-status {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+            }
+            
+            .header-toggles {
+                gap: 6px;
+                margin-right: 8px;
+            }
+            
+            .toggle-btn {
+                width: 40px;
+                height: 40px;
+                min-width: 40px;
+                font-size: 1.1rem;
+            }
+            
             .logo-section {
                 justify-content: center;
             }
@@ -1277,6 +1474,29 @@
                 display: none;
             }
             
+            /* Compact toggles for small screens */
+            .header-toggles {
+                gap: 4px;
+                margin-right: 6px;
+            }
+            
+            .toggle-btn {
+                width: 36px;
+                height: 36px;
+                min-width: 36px;
+                font-size: 1rem;
+                border-radius: 6px;
+            }
+            
+            .connection-badge {
+                padding: 4px 8px;
+                font-size: 0.7rem;
+            }
+            
+            .badge-text {
+                display: none;
+            }
+            
             .logo-icon {
                 font-size: 1.75rem;
             }
@@ -1299,6 +1519,17 @@
             
             .word-action-btn {
                 flex: 1 1 100%;
+            }
+            
+            /* Sentence controls - compact */
+            .sentence-controls {
+                gap: 4px;
+            }
+            
+            .sentence-btn {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
             }
             
             /* Correction modal */
@@ -1344,13 +1575,18 @@
                 min-height: 48px;
             }
             
+            .toggle-btn {
+                min-width: 44px;
+                min-height: 44px;
+            }
+            
             .history-fb-btn {
                 width: 36px;
                 height: 36px;
             }
             
             /* Remove hover effects that don't work on touch */
-            .btn:hover, .feedback-btn:hover, .word-action-btn:hover {
+            .btn:hover, .feedback-btn:hover, .word-action-btn:hover, .toggle-btn:hover {
                 transform: none;
             }
             
@@ -1364,7 +1600,7 @@
                 transform: scale(0.97);
             }
             
-            .word-action-btn:active {
+            .word-action-btn:active, .toggle-btn:active {
                 transform: scale(0.95);
                 background: rgba(255,255,255,0.2);
             }
@@ -1418,6 +1654,30 @@
                 </div>
                 
                 <div class="header-status">
+                    <!-- Quick Toggles -->
+                                    <div class="header-toggles">
+                                        <button class="toggle-btn" id="themeToggle" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+                                            <span class="toggle-icon" id="themeIcon">🌙</span>
+                                        </button>
+                                        <button class="toggle-btn" id="soundToggle" title="Toggle Sound Effects" aria-label="Toggle sound">
+                                            <span class="toggle-icon" id="soundIcon">🔊</span>
+                                        </button>
+                                        <button class="toggle-btn" id="ttsToggle" title="Toggle Text-to-Speech" aria-label="Toggle speech">
+                                            <span class="toggle-icon" id="ttsIcon">🗣️</span>
+                                        </button>
+                                        <button class="toggle-btn analytics-toggle" id="analyticsToggle" title="Toggle Analytics Dashboard" aria-label="Toggle analytics">
+                                            <span class="toggle-icon">📊</span>
+                                        </button>
+                                        <button class="toggle-btn" id="practiceToggle" title="Practice Mode" aria-label="Toggle practice mode">
+                                            <span class="toggle-icon">🎯</span>
+                                        </button>
+                                        <button class="toggle-btn" id="shortcutsToggle" title="Word Shortcuts" aria-label="Toggle word shortcuts">
+                                            <span class="toggle-icon">⚡</span>
+                                        </button>
+                                        <button class="toggle-btn pip-toggle-btn" id="pipToggle" title="Picture-in-Picture Mode" aria-label="Toggle floating mode">
+                                            <span class="toggle-icon">📌</span>
+                                        </button>
+                                    </div>
                     <div class="connection-badge browser-mode" id="connectionBadge" role="status" aria-live="polite">
                         <span class="badge-dot connected" id="statusDot" aria-hidden="true"></span>
                         <span class="badge-text" id="statusText">Browser Mode</span>
@@ -1452,6 +1712,30 @@
                             <div class="video-wrapper">
                                 <video id="webcam" autoplay muted playsinline aria-label="Camera feed for sign language input"></video>
                                 <canvas id="overlay-canvas" aria-hidden="true"></canvas>
+                                
+                                <!-- MediaPipe Error Overlay -->
+                                <div class="mediapipe-error-overlay" id="mediapipeErrorOverlay" style="display: none;">
+                                    <div class="error-content">
+                                        <div class="error-icon">⚠️</div>
+                                        <div class="error-title">Hand Detection Issue</div>
+                                        <div class="error-message" id="mediapipeErrorMessage">MediaPipe is not responding</div>
+                                        <button class="error-retry-btn" id="mediapipeRetryBtn">
+                                            <span>🔄</span> Retry
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- ONNX Model Loading/Error Overlay -->
+                                <div class="model-status-overlay" id="modelStatusOverlay" style="display: none;">
+                                    <div class="model-status-content">
+                                        <div class="model-status-spinner"></div>
+                                        <div class="model-status-text" id="modelStatusText">Loading AI Model...</div>
+                                        <div class="model-status-progress" id="modelStatusProgress"></div>
+                                        <button class="error-retry-btn" id="modelRetryBtn" style="display: none;">
+                                            <span>🔄</span> Retry Loading
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             
                             <!-- Buffer Progress Bar - Minimal -->
@@ -1578,6 +1862,9 @@
                                 Word Formation
                             </h3>
                             <div class="sentence-controls">
+                                <button class="sentence-btn" id="speakTextBtn" title="Speak text aloud">
+                                    <span>🔊</span>
+                                </button>
                                 <button class="sentence-btn" id="copyTextBtn" title="Copy to clipboard">
                                     <span>📋</span>
                                 </button>
@@ -1678,7 +1965,7 @@
         </div>
     </footer>
 
-    <!-- Camera Error Modal -->
+    <!-- Camera Error Modal - Enhanced -->
     <div class="camera-error-modal" id="cameraErrorModal" style="display: none;">
         <div class="camera-error-content">
             <div class="camera-error-icon">📹</div>
@@ -1688,21 +1975,60 @@
             </p>
             <div class="camera-error-actions">
                 <button class="btn btn-start" id="retryCameraBtn">
-                    <span class="btn-text">Try Again</span>
+                    <span class="btn-text">🔄 Try Again</span>
                 </button>
-                <button class="btn btn-reset" id="closeCameraErrorBtn">
-                    <span class="btn-text">Close</span>
+                <button class="btn btn-reset" id="openSettingsBtn" style="display: none;">
+                    <span class="btn-text">⚙️ Open Settings</span>
                 </button>
             </div>
             <div class="camera-error-help">
-                <details>
-                    <summary>How to enable camera access</summary>
-                    <ol>
-                        <li>Click the camera icon in your browser's address bar</li>
-                        <li>Select "Allow" for camera permissions</li>
-                        <li>Refresh the page if needed</li>
-                    </ol>
+                <details open>
+                    <summary>📖 How to enable camera access</summary>
+                    
+                    <!-- Chrome/Edge Instructions -->
+                    <div class="browser-instructions" id="chromeInstructions">
+                        <h4>🌐 Chrome / Edge</h4>
+                        <ol>
+                            <li>Click the <strong>🔒 lock icon</strong> in the address bar (left side)</li>
+                            <li>Find <strong>"Camera"</strong> and select <strong>"Allow"</strong></li>
+                            <li>Click <strong>"Try Again"</strong> above</li>
+                        </ol>
+                    </div>
+                    
+                    <!-- Firefox Instructions -->
+                    <div class="browser-instructions" id="firefoxInstructions" style="display: none;">
+                        <h4>🦊 Firefox</h4>
+                        <ol>
+                            <li>Click the <strong>🎥 camera icon</strong> in the address bar</li>
+                            <li>Select <strong>"Allow"</strong> from the dropdown</li>
+                            <li>Click <strong>"Try Again"</strong> above</li>
+                        </ol>
+                    </div>
+                    
+                    <!-- Safari Instructions -->
+                    <div class="browser-instructions" id="safariInstructions" style="display: none;">
+                        <h4>🧭 Safari</h4>
+                        <ol>
+                            <li>Go to <strong>Safari → Settings → Websites → Camera</strong></li>
+                            <li>Find this website and select <strong>"Allow"</strong></li>
+                            <li>Refresh the page and try again</li>
+                        </ol>
+                    </div>
+                    
+                    <!-- Mobile Instructions -->
+                    <div class="browser-instructions" id="mobileInstructions" style="display: none;">
+                        <h4>📱 Mobile Browser</h4>
+                        <ol>
+                            <li>When prompted, tap <strong>"Allow"</strong></li>
+                            <li>If denied, go to your device <strong>Settings → Apps → Browser → Permissions → Camera</strong></li>
+                            <li>Enable camera access and refresh</li>
+                        </ol>
+                    </div>
                 </details>
+                
+                <div class="camera-error-tip">
+                    <strong>💡 Tip:</strong> If the camera still doesn't work, try refreshing the page (Ctrl+R or Cmd+R)
+                </div>
             </div>
         </div>
     </div>
@@ -1760,6 +2086,305 @@
         </div>
     </div>
 
+    <!-- Analytics Panel (Slide-out) -->
+    <aside class="analytics-panel" id="analyticsPanel" aria-label="Analytics Dashboard">
+        <div class="analytics-header">
+            <h3>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3v18h18"/>
+                    <path d="M18 17V9"/>
+                    <path d="M13 17V5"/>
+                    <path d="M8 17v-3"/>
+                </svg>
+                Live Analytics
+            </h3>
+            <button class="analytics-close" id="analyticsClose" aria-label="Close analytics">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="analytics-content">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="analyticsDuration">00:00</div>
+                    <div class="stat-label">Session Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="analyticsPredictions">0</div>
+                    <div class="stat-label">Predictions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="analyticsAccuracy">0%</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="analyticsAvgConfidence">0%</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+            </div>
+            
+            <!-- Performance Metrics (New!) -->
+            <div class="analytics-section performance-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                    Performance Metrics
+                </h4>
+                <div class="perf-grid">
+                    <div class="perf-item">
+                        <span class="perf-label">FPS</span>
+                        <span class="perf-value" id="perfFps">0</span>
+                    </div>
+                    <div class="perf-item">
+                        <span class="perf-label">Inference</span>
+                        <span class="perf-value" id="perfInference">0ms</span>
+                    </div>
+                    <div class="perf-item">
+                        <span class="perf-label">MediaPipe</span>
+                        <span class="perf-value" id="perfMediapipe">0ms</span>
+                    </div>
+                    <div class="perf-item">
+                        <span class="perf-label">Memory</span>
+                        <span class="perf-value" id="perfMemory">--</span>
+                    </div>
+                </div>
+                <div class="perf-chart" id="perfChart">
+                    <canvas id="perfChartCanvas" width="360" height="60"></canvas>
+                </div>
+            </div>
+            
+            <!-- Model & Offline Status -->
+            <div class="analytics-section status-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                    </svg>
+                    System Status
+                </h4>
+                <div class="status-items">
+                    <div class="status-item">
+                        <span class="status-indicator" id="offlineIndicator"></span>
+                        <span class="status-text" id="offlineStatus">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-indicator" id="modelIndicator"></span>
+                        <span class="status-text" id="modelVersion">Model: --</span>
+                    </div>
+                    <div class="status-item" id="updateAvailable" style="display: none;">
+                        <span class="status-indicator update"></span>
+                        <span class="status-text">Update available!</span>
+                        <button class="update-btn" id="updateModelBtn">Update</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Confidence Chart -->
+            <div class="analytics-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    Confidence Trend
+                </h4>
+                <div class="chart-container" id="confidenceChart">
+                    <div class="chart-empty">No data yet</div>
+                </div>
+            </div>
+            
+            <!-- Confusion Pairs -->
+            <div class="analytics-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <path d="M12 17h.01"/>
+                    </svg>
+                    Top Confusions
+                </h4>
+                <div class="confusion-list" id="confusionList">
+                    <div class="confusion-empty">No confusions recorded</div>
+                </div>
+            </div>
+            
+            <!-- Recent History -->
+            <div class="analytics-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Recent Flow
+                </h4>
+                <div class="history-container" id="analyticsHistory">
+                    <div class="history-empty">No predictions yet</div>
+                </div>
+            </div>
+            
+            <!-- Mastery Progress -->
+            <div class="analytics-section">
+                <h4>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                    Session Mastery
+                </h4>
+                <div class="mastery-container">
+                    <div class="mastery-bar-container">
+                        <div class="mastery-bar" id="masteryProgress" style="width: 0%"></div>
+                    </div>
+                    <div class="mastery-text" id="masteryText">0/40 signs practiced</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Session Recording for Debugging -->
+        <div class="analytics-section recording-section">
+            <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                </svg>
+                Debug Recording
+            </h4>
+            <div class="recording-controls">
+                <button class="record-btn" id="recordToggleBtn">
+                    <span class="record-icon" id="recordIcon">⏺</span>
+                    <span class="record-text" id="recordText">Start Recording</span>
+                </button>
+                <div class="recording-status" id="recordingStatus">
+                    <span class="recording-time" id="recordingTime">00:00</span>
+                    <span class="recording-frames" id="recordingFrames">0 frames</span>
+                </div>
+            </div>
+            <p class="recording-help">Records predictions, landmarks & timing for debugging</p>
+        </div>
+        
+        <div class="analytics-footer">
+            <button class="export-btn" id="analyticsExport">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Export Session Data
+            </button>
+            <button class="export-btn recording-export" id="exportRecordingBtn" style="display: none;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+                Export Recording
+            </button>
+        </div>
+    </aside>
+
+    <!-- Practice Mode Panel -->
+    <div class="practice-panel" id="practicePanel">
+        <div class="practice-header">
+            <h3>Practice Mode</h3>
+            <button class="practice-close" id="practiceClose">×</button>
+        </div>
+        <div class="practice-content">
+            <div class="practice-reference">
+                <img id="practiceReferenceImage" class="practice-reference-image" src="" alt="Sign reference">
+                <div class="practice-sign-info">
+                    <div class="practice-sign-label" id="practiceSignLabel">-</div>
+                    <div class="practice-urdu-label" id="practiceUrduLabel">-</div>
+                </div>
+            </div>
+            
+            <div class="practice-hold-container">
+                <div class="practice-hold-bar">
+                    <div class="practice-hold-fill" id="practiceHoldProgress"></div>
+                </div>
+                <div class="practice-hold-text" id="practiceHoldText">Show the sign above</div>
+            </div>
+            
+            <div class="practice-stats">
+                <div class="practice-stat">
+                    <div class="practice-stat-value" id="practiceStreak">0</div>
+                    <div class="practice-stat-label">Streak 🔥</div>
+                </div>
+                <div class="practice-stat">
+                    <div class="practice-stat-value" id="practiceAccuracy">0%</div>
+                    <div class="practice-stat-label">Accuracy</div>
+                </div>
+            </div>
+            
+            <div class="practice-controls">
+                <button class="practice-btn practice-btn-secondary" id="practiceSkip">
+                    ⏭️ Skip
+                </button>
+                <button class="practice-btn practice-btn-primary" id="practiceWeakSigns">
+                    🎯 Weak Signs
+                </button>
+                <button class="practice-btn practice-btn-secondary" id="practiceRandom">
+                    🎲 Random
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disambiguation Container -->
+    <div class="disambiguation-overlay" id="disambiguationOverlay"></div>
+    <div class="disambiguation-container" id="disambiguationContainer">
+        <div class="disambiguation-header">
+            <div class="disambiguation-title" id="disambiguationTitle">Did you mean...?</div>
+            <button class="disambiguation-dismiss" id="disambiguationDismiss">Use Top</button>
+        </div>
+        <div class="disambiguation-hint" id="disambiguationHint" style="display: none;">
+            <!-- Hints injected dynamically -->
+        </div>
+        <div class="disambiguation-options" id="disambiguationOptions">
+            <!-- Options injected dynamically -->
+        </div>
+    </div>
+
+    <!-- Word Shortcuts Panel -->
+    <div class="shortcuts-panel" id="shortcutsPanel">
+        <div class="shortcuts-header">
+            <h3>Quick Words</h3>
+            <button class="shortcuts-close" id="shortcutsClose">×</button>
+        </div>
+        <div class="shortcuts-search">
+            <input type="text" id="shortcutsSearch" placeholder="🔍 Search words...">
+        </div>
+        <div class="shortcuts-category-tabs" id="shortcutsCategoryTabs">
+            <!-- Tabs injected dynamically -->
+        </div>
+        <div class="shortcuts-word-grid" id="shortcutsWordGrid">
+            <!-- Word buttons injected dynamically -->
+        </div>
+        <button class="shortcuts-add-custom" id="shortcutsAddCustom">
+            ➕ Add Custom Word
+        </button>
+    </div>
+
+    <!-- Custom Shortcut Modal -->
+    <div class="custom-shortcut-modal" id="customShortcutModal">
+        <div class="custom-modal-content">
+            <h4>Add Custom Word</h4>
+            <div class="custom-modal-field">
+                <label for="customUrduInput">Urdu Word</label>
+                <input type="text" id="customUrduInput" placeholder="اردو لفظ" dir="rtl">
+            </div>
+            <div class="custom-modal-field">
+                <label for="customRomanizedInput">Romanized (Optional)</label>
+                <input type="text" id="customRomanizedInput" placeholder="e.g., Salam">
+            </div>
+            <div class="custom-modal-actions">
+                <button class="custom-cancel-btn" id="customCancelBtn">Cancel</button>
+                <button class="custom-save-btn" id="customSaveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Container -->
     <div class="notification-container" id="notificationContainer"></div>
     
@@ -1794,6 +2419,14 @@
     <script src="js/cloud_sync.js"></script>
     <script src="js/feedback_manager.js"></script>
     <script src="js/word_formation.js"></script>
+    <script src="js/analytics.js"></script>
+    
+    <!-- Innovation Modules -->
+    <script src="js/practice-mode.js"></script>
+    <script src="js/disambiguation.js"></script>
+    <script src="js/word-shortcuts.js"></script>
+    <script src="js/pip-mode.js"></script>
+    
     <script src="js/app_browser.js"></script>
     
     <!-- Initialize App -->

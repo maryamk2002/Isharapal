@@ -1,0 +1,767 @@
+/**
+ * Innovation Modules Stylesheet
+ * Styles for Practice Mode, Disambiguation, Word Shortcuts, and PiP Mode
+ */
+
+/* ============================================
+   SHARED VARIABLES & UTILITIES
+   ============================================ */
+
+:root {
+    /* Innovation-specific colors */
+    --inn-practice-accent: #4ecdc4;
+    --inn-practice-bg: rgba(78, 205, 196, 0.1);
+    --inn-disambig-accent: #ffd93d;
+    --inn-disambig-bg: rgba(255, 217, 61, 0.1);
+    --inn-shortcuts-accent: #6c5ce7;
+    --inn-shortcuts-bg: rgba(108, 92, 231, 0.1);
+    --inn-pip-accent: #00cec9;
+    
+    /* Panel sizing */
+    --panel-width: 380px;
+    --panel-max-height: 85vh;
+}
+
+/* ============================================
+   PRACTICE MODE PANEL
+   ============================================ */
+
+.practice-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    width: min(90vw, 420px);
+    max-height: var(--panel-max-height);
+    background: var(--zen-card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    border: 1px solid var(--zen-card-border);
+    box-shadow: var(--zen-shadow), 0 0 60px rgba(78, 205, 196, 0.15);
+    z-index: 1002;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.practice-panel.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.practice-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--inn-practice-bg), transparent);
+    border-bottom: 1px solid var(--zen-card-border);
+}
+
+.practice-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--zen-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.practice-header h3::before {
+    content: '🎯';
+}
+
+.practice-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--zen-text);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.practice-close:hover {
+    background: var(--zen-error);
+    color: white;
+}
+
+.practice-content {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Reference Image Display */
+.practice-reference {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.practice-reference-image {
+    width: 180px;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 16px;
+    border: 3px solid var(--inn-practice-accent);
+    box-shadow: 0 8px 24px rgba(78, 205, 196, 0.2);
+    background: #f0f0f0;
+}
+
+.practice-sign-info {
+    margin-top: 12px;
+}
+
+.practice-sign-label {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--zen-text);
+}
+
+.practice-urdu-label {
+    font-size: 2rem;
+    font-family: 'Noto Nastaliq Urdu', serif;
+    color: var(--inn-practice-accent);
+    margin-top: 4px;
+}
+
+/* Hold Progress */
+.practice-hold-container {
+    margin: 20px 0;
+}
+
+.practice-hold-bar {
+    height: 12px;
+    background: rgba(78, 205, 196, 0.2);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.practice-hold-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--inn-practice-accent), #7ee8e0);
+    border-radius: 6px;
+    transition: width 0.1s ease;
+}
+
+.practice-hold-text {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 0.9rem;
+    color: var(--zen-text-muted);
+}
+
+/* Practice Stats */
+.practice-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.practice-stat {
+    background: var(--inn-practice-bg);
+    padding: 16px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+.practice-stat-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--inn-practice-accent);
+}
+
+.practice-stat-label {
+    font-size: 0.75rem;
+    color: var(--zen-text-muted);
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+/* Practice Controls */
+.practice-controls {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.practice-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.practice-btn-primary {
+    background: linear-gradient(135deg, var(--inn-practice-accent), #3db8b0);
+    color: white;
+}
+
+.practice-btn-secondary {
+    background: rgba(78, 205, 196, 0.15);
+    color: var(--inn-practice-accent);
+}
+
+.practice-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+}
+
+/* ============================================
+   DISAMBIGUATION CONTAINER
+   ============================================ */
+
+.disambiguation-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1003;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.disambiguation-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.disambiguation-container {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    width: min(95vw, 500px);
+    background: var(--zen-card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 20px;
+    border: 2px solid var(--inn-disambig-accent);
+    box-shadow: 0 12px 48px rgba(255, 217, 61, 0.2), var(--zen-shadow);
+    z-index: 1004;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.disambiguation-container.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+.disambiguation-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, var(--inn-disambig-bg), transparent);
+    border-bottom: 1px solid rgba(255, 217, 61, 0.2);
+}
+
+.disambiguation-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--zen-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.disambiguation-title::before {
+    content: '🤔';
+}
+
+.disambiguation-dismiss {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--zen-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.disambiguation-dismiss:hover {
+    background: var(--zen-error);
+    color: white;
+}
+
+/* Disambiguation Hint */
+.disambiguation-hint {
+    padding: 12px 18px;
+    background: rgba(255, 217, 61, 0.08);
+    border-bottom: 1px solid rgba(255, 217, 61, 0.15);
+}
+
+.hint-urdu {
+    font-family: 'Noto Nastaliq Urdu', serif;
+    font-size: 1.1rem;
+    color: var(--inn-disambig-accent);
+    direction: rtl;
+    margin-bottom: 4px;
+}
+
+.hint-english {
+    font-size: 0.85rem;
+    color: var(--zen-text-muted);
+}
+
+/* Disambiguation Options Grid */
+.disambiguation-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    padding: 16px;
+}
+
+.disambiguation-option {
+    position: relative;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid transparent;
+    border-radius: 16px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.disambiguation-option:hover {
+    background: rgba(255, 217, 61, 0.1);
+    border-color: var(--inn-disambig-accent);
+    transform: translateY(-4px);
+}
+
+.disambiguation-option.selected {
+    background: var(--inn-disambig-bg);
+    border-color: var(--inn-disambig-accent);
+    box-shadow: 0 0 20px rgba(255, 217, 61, 0.3);
+}
+
+.option-number {
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    width: 24px;
+    height: 24px;
+    background: var(--inn-disambig-accent);
+    color: #000;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.option-image-container {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 10px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f0f0f0;
+}
+
+.option-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.option-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--zen-text);
+    margin-bottom: 4px;
+}
+
+.option-confidence {
+    font-size: 0.8rem;
+    color: var(--inn-disambig-accent);
+    font-weight: 500;
+}
+
+/* ============================================
+   WORD SHORTCUTS PANEL
+   ============================================ */
+
+.shortcuts-panel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 50vh;
+    background: var(--zen-card-bg);
+    backdrop-filter: blur(20px);
+    border-radius: 24px 24px 0 0;
+    border: 1px solid var(--zen-card-border);
+    border-bottom: none;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.shortcuts-panel.visible {
+    transform: translateY(0);
+}
+
+.shortcuts-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--zen-card-border);
+}
+
+.shortcuts-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--zen-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shortcuts-header h3::before {
+    content: '⚡';
+}
+
+.shortcuts-close {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--zen-text);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.shortcuts-close:hover {
+    background: var(--zen-error);
+    color: white;
+}
+
+/* Search Bar */
+.shortcuts-search {
+    padding: 0 20px;
+    margin: 12px 0;
+}
+
+.shortcuts-search input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--zen-card-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--zen-text);
+    font-size: 0.95rem;
+    transition: all 0.2s ease;
+}
+
+.shortcuts-search input:focus {
+    outline: none;
+    border-color: var(--inn-shortcuts-accent);
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+}
+
+.shortcuts-search input::placeholder {
+    color: var(--zen-text-muted);
+}
+
+/* Category Tabs */
+.shortcuts-category-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 0 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.shortcuts-category-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.category-tab {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--zen-text-muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.category-tab:hover {
+    background: rgba(108, 92, 231, 0.15);
+    color: var(--inn-shortcuts-accent);
+}
+
+.category-tab.active {
+    background: var(--inn-shortcuts-accent);
+    color: white;
+}
+
+.category-icon {
+    font-size: 1rem;
+}
+
+/* Word Grid */
+.shortcuts-word-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.word-shortcut-btn {
+    padding: 12px 8px;
+    border: 1px solid var(--zen-card-border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.word-shortcut-btn:hover {
+    background: var(--inn-shortcuts-bg);
+    border-color: var(--inn-shortcuts-accent);
+    transform: translateY(-2px);
+}
+
+.word-emoji {
+    font-size: 1.5rem;
+}
+
+.word-urdu {
+    font-family: 'Noto Nastaliq Urdu', serif;
+    font-size: 1.1rem;
+    color: var(--zen-text);
+    direction: rtl;
+}
+
+.word-romanized {
+    font-size: 0.7rem;
+    color: var(--zen-text-muted);
+}
+
+/* Add Custom Button */
+.shortcuts-add-custom {
+    margin: 12px 20px;
+    padding: 12px;
+    border: 2px dashed var(--zen-card-border);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--zen-text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.shortcuts-add-custom:hover {
+    border-color: var(--inn-shortcuts-accent);
+    color: var(--inn-shortcuts-accent);
+}
+
+/* Custom Shortcut Modal */
+.custom-shortcut-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1010;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-shortcut-modal.visible {
+    display: flex;
+}
+
+.custom-modal-content {
+    width: min(90vw, 360px);
+    background: var(--zen-card-bg);
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: var(--zen-shadow);
+}
+
+.custom-modal-content h4 {
+    margin: 0 0 20px;
+    font-size: 1.2rem;
+    color: var(--zen-text);
+}
+
+.custom-modal-field {
+    margin-bottom: 16px;
+}
+
+.custom-modal-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    color: var(--zen-text-muted);
+}
+
+.custom-modal-field input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--zen-card-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--zen-text);
+    font-size: 1rem;
+}
+
+.custom-modal-field input:focus {
+    outline: none;
+    border-color: var(--inn-shortcuts-accent);
+}
+
+.custom-modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.custom-modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.custom-save-btn {
+    background: var(--inn-shortcuts-accent);
+    color: white;
+}
+
+.custom-cancel-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--zen-text);
+}
+
+/* ============================================
+   PIP MODE (Floating Container is in JS)
+   ============================================ */
+
+/* PiP toggle button in header */
+.pip-toggle-btn {
+    background: linear-gradient(135deg, var(--inn-pip-accent), #00b894) !important;
+}
+
+.pip-toggle-btn:hover {
+    box-shadow: 0 4px 12px rgba(0, 206, 201, 0.4);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+@media (max-width: 640px) {
+    .practice-panel {
+        width: 95vw;
+        max-height: 90vh;
+    }
+    
+    .practice-reference-image {
+        width: 140px;
+        height: 140px;
+    }
+    
+    .disambiguation-container {
+        width: 98vw;
+        bottom: 80px;
+    }
+    
+    .disambiguation-options {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        padding: 12px;
+    }
+    
+    .option-image-container {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .shortcuts-panel {
+        max-height: 60vh;
+    }
+    
+    .shortcuts-word-grid {
+        grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    }
+}
+
+/* ============================================
+   DARK MODE OVERRIDES
+   ============================================ */
+
+[data-theme="dark"] .practice-reference-image,
+[data-theme="dark"] .option-image-container {
+    background: #1a2027;
+}
+
+[data-theme="dark"] .disambiguation-container {
+    border-color: rgba(255, 217, 61, 0.5);
+}
+
+[data-theme="dark"] .word-shortcut-btn:hover {
+    background: rgba(108, 92, 231, 0.2);
+}
+

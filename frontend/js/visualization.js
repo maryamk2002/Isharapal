@@ -8,6 +8,7 @@ class HandVisualizer {
         this.canvas = null;
         this.ctx = null;
         this.isActive = false;
+        this.isDestroyed = false; // Prevent operations after destroy
         this.currentPrediction = null;
         this.predictionConfidence = 0;
         this.currentKeypoints = null;
@@ -89,29 +90,43 @@ class HandVisualizer {
     }
     
     draw() {
+        // Prevent operations after destroy
+        if (this.isDestroyed) {
+            return;
+        }
+        
         if (!this.ctx || !this.canvas) {
             return;
         }
         
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Update FPS
-        this.updateFPS();
-        
-        // Draw hand skeleton from backend keypoints
-        if (this.currentKeypoints) {
-            this.drawBackendKeypoints(this.currentKeypoints);
+        // Check canvas has valid dimensions
+        if (this.canvas.width === 0 || this.canvas.height === 0) {
+            return;
         }
         
-        // Draw prediction overlay
-        if (this.currentPrediction) {
-            this.drawPredictionOverlay();
-        }
-        
-        // Draw confidence indicator
-        if (this.predictionConfidence > 0) {
-            this.drawConfidenceIndicator();
+        try {
+            // Clear canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            // Update FPS
+            this.updateFPS();
+            
+            // Draw hand skeleton from backend keypoints
+            if (this.currentKeypoints) {
+                this.drawBackendKeypoints(this.currentKeypoints);
+            }
+            
+            // Draw prediction overlay
+            if (this.currentPrediction) {
+                this.drawPredictionOverlay();
+            }
+            
+            // Draw confidence indicator
+            if (this.predictionConfidence > 0) {
+                this.drawConfidenceIndicator();
+            }
+        } catch (error) {
+            console.error('[Visualizer] Error in draw:', error);
         }
     }
     
@@ -248,65 +263,80 @@ class HandVisualizer {
      * Draw hand skeleton from backend keypoints (flat array format)
      */
     drawBackendKeypoints(keypoints) {
-        if (!keypoints || keypoints.length < 63) {
+        // Null/undefined check
+        if (!keypoints || !Array.isArray(keypoints)) {
+            return;
+        }
+        
+        if (keypoints.length < 63) {
             return;  // Need at least 1 hand (21 landmarks × 3 coords = 63 values)
         }
         
-        // Hand connection indices (MediaPipe standard)
-        const connections = [
-            // Thumb
-            [0, 1], [1, 2], [2, 3], [3, 4],
-            // Index finger
-            [0, 5], [5, 6], [6, 7], [7, 8],
-            // Middle finger
-            [0, 9], [9, 10], [10, 11], [11, 12],
-            // Ring finger
-            [0, 13], [13, 14], [14, 15], [15, 16],
-            // Pinky
-            [0, 17], [17, 18], [18, 19], [19, 20],
-            // Palm connections
-            [5, 9], [9, 13], [13, 17]
-        ];
-        
-        // Extract hands (each hand is 63 values: 21 landmarks × 3 coords)
-        const hands = [];
-        
-        // First hand (landmarks 0-62)
-        if (keypoints.length >= 63) {
-            const hand1 = [];
-            for (let i = 0; i < 63; i += 3) {
-                hand1.push({
-                    x: keypoints[i],
-                    y: keypoints[i + 1],
-                    z: keypoints[i + 2]
-                });
+        try {
+            // Hand connection indices (MediaPipe standard)
+            const connections = [
+                // Thumb
+                [0, 1], [1, 2], [2, 3], [3, 4],
+                // Index finger
+                [0, 5], [5, 6], [6, 7], [7, 8],
+                // Middle finger
+                [0, 9], [9, 10], [10, 11], [11, 12],
+                // Ring finger
+                [0, 13], [13, 14], [14, 15], [15, 16],
+                // Pinky
+                [0, 17], [17, 18], [18, 19], [19, 20],
+                // Palm connections
+                [5, 9], [9, 13], [13, 17]
+            ];
+            
+            // Extract hands (each hand is 63 values: 21 landmarks × 3 coords)
+            const hands = [];
+            
+            // First hand (landmarks 0-62)
+            if (keypoints.length >= 63) {
+                const hand1 = [];
+                for (let i = 0; i < 63; i += 3) {
+                    // Bounds check for array access
+                    if (i + 2 < keypoints.length) {
+                        hand1.push({
+                            x: keypoints[i],
+                            y: keypoints[i + 1],
+                            z: keypoints[i + 2]
+                        });
+                    }
+                }
+                // Only add if not all zeros and has 21 landmarks
+                if (hand1.length === 21 && hand1.some(p => p.x !== 0 || p.y !== 0)) {
+                    hands.push({ landmarks: hand1, color: '#00ff00' });  // Green for first hand
+                }
             }
-            // Only add if not all zeros
-            if (hand1.some(p => p.x !== 0 || p.y !== 0)) {
-                hands.push({ landmarks: hand1, color: '#00ff00' });  // Green for first hand
+            
+            // Second hand (landmarks 63-125)
+            if (keypoints.length >= 126) {
+                const hand2 = [];
+                for (let i = 63; i < 126; i += 3) {
+                    // Bounds check for array access
+                    if (i + 2 < keypoints.length) {
+                        hand2.push({
+                            x: keypoints[i],
+                            y: keypoints[i + 1],
+                            z: keypoints[i + 2]
+                        });
+                    }
+                }
+                // Only add if not all zeros and has 21 landmarks
+                if (hand2.length === 21 && hand2.some(p => p.x !== 0 || p.y !== 0)) {
+                    hands.push({ landmarks: hand2, color: '#ff00ff' });  // Magenta for second hand
+                }
             }
+            
+            // Draw each hand
+            hands.forEach(hand => {
+                this.drawHandSkeleton(hand.landmarks, hand.color, connections);
+            });
+        } catch (error) {
+            console.error('[Visualizer] Error in drawBackendKeypoints:', error);
         }
-        
-        // Second hand (landmarks 63-125)
-        if (keypoints.length >= 126) {
-            const hand2 = [];
-            for (let i = 63; i < 126; i += 3) {
-                hand2.push({
-                    x: keypoints[i],
-                    y: keypoints[i + 1],
-                    z: keypoints[i + 2]
-                });
-            }
-            // Only add if not all zeros
-            if (hand2.some(p => p.x !== 0 || p.y !== 0)) {
-                hands.push({ landmarks: hand2, color: '#ff00ff' });  // Magenta for second hand
-            }
-        }
-        
-        // Draw each hand
-        hands.forEach(hand => {
-            this.drawHandSkeleton(hand.landmarks, hand.color, connections);
-        });
     }
     
     /**
@@ -567,12 +597,38 @@ class HandVisualizer {
     }
     
     destroy() {
+        console.log('[Visualizer] Destroying...');
+        
+        // Mark as destroyed first to prevent any further operations
+        this.isDestroyed = true;
+        
+        // Stop animation
         this.stopAnimation();
+        
+        // Clear canvas
         this.clear();
         
+        // Reset all state
+        this.currentPrediction = null;
+        this.predictionConfidence = 0;
+        this.currentKeypoints = null;
+        this.lastValidKeypoints = null;
+        this.keypointsMissingStart = null;
+        this.fpsHistory = [];
+        this.currentFPS = 0;
+        this.frameCount = 0;
+        this.effects = {
+            predictionPulse: false,
+            confidenceGlow: false,
+            landmarkHighlight: false
+        };
+        
+        // Clear references
         this.canvas = null;
         this.ctx = null;
         this.isActive = false;
+        
+        console.log('[Visualizer] Destroyed');
     }
     
     // Getters

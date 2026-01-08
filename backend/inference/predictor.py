@@ -152,17 +152,45 @@ class RealTimePredictor:
                 if len(sequence) != target_length:
                     sequence = self._pad_truncate_sequence(sequence, target_length)
                 
-                # Convert to tensor
-                sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0).to(self.device)
+                # Convert to tensor with device fallback
+                try:
+                    sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0).to(self.device)
+                except RuntimeError as cuda_error:
+                    # CUDA error - attempt fallback to CPU
+                    if 'CUDA' in str(cuda_error).upper() or 'cuda' in str(cuda_error):
+                        logger.warning(f"CUDA error, falling back to CPU: {cuda_error}")
+                        self.device = torch.device("cpu")
+                        self.model = self.model.to(self.device)
+                        sequence_tensor = torch.FloatTensor(sequence).unsqueeze(0).to(self.device)
+                    else:
+                        raise
                 
-                # Make prediction
-                with torch.no_grad():
-                    logits = self.model(sequence_tensor)
-                    probabilities = torch.softmax(logits, dim=1)
-                    confidence, predicted_idx = torch.max(probabilities, dim=1)
-                    
-                    predicted_label = self.labels[predicted_idx.item()]
-                    confidence_score = confidence.item()
+                # Make prediction with device fallback
+                try:
+                    with torch.no_grad():
+                        logits = self.model(sequence_tensor)
+                        probabilities = torch.softmax(logits, dim=1)
+                        confidence, predicted_idx = torch.max(probabilities, dim=1)
+                        
+                        predicted_label = self.labels[predicted_idx.item()]
+                        confidence_score = confidence.item()
+                except RuntimeError as cuda_error:
+                    # CUDA error during inference - fallback to CPU
+                    if 'CUDA' in str(cuda_error).upper() or 'cuda' in str(cuda_error):
+                        logger.warning(f"CUDA error during inference, falling back to CPU: {cuda_error}")
+                        self.device = torch.device("cpu")
+                        self.model = self.model.to(self.device)
+                        sequence_tensor = sequence_tensor.to(self.device)
+                        
+                        with torch.no_grad():
+                            logits = self.model(sequence_tensor)
+                            probabilities = torch.softmax(logits, dim=1)
+                            confidence, predicted_idx = torch.max(probabilities, dim=1)
+                            
+                            predicted_label = self.labels[predicted_idx.item()]
+                            confidence_score = confidence.item()
+                    else:
+                        raise
                 
                 # Get all predictions if requested
                 all_predictions = []
@@ -207,19 +235,20 @@ class RealTimePredictor:
             if smoothing_alpha is None:
                 smoothing_alpha = inference_config.SMOOTHING_ALPHA
             
-            # Get current prediction
+            # Get current prediction (this already acquires lock internally)
             result = self.predict(sequence, return_all_predictions=True)
             if result is None:
                 return None
             
             predicted_label, confidence, all_predictions = result
             
-            # Add to history
-            self.prediction_history.append({
-                'label': predicted_label,
-                'confidence': confidence,
-                'timestamp': time.time()
-            })
+            # Add to history with lock for thread safety
+            with self.lock:
+                self.prediction_history.append({
+                    'label': predicted_label,
+                    'confidence': confidence,
+                    'timestamp': time.time()
+                })
             
             # Apply smoothing if we have enough history
             if len(self.prediction_history) >= 3:

@@ -11,6 +11,16 @@
  * - Works offline after initial load
  */
 
+// DEBUG flag - set to false for production to reduce console noise
+const PSL_DEBUG = false;
+
+// Debug logger helper
+function debugLog(...args) {
+    if (PSL_DEBUG) {
+        console.log(...args);
+    }
+}
+
 class PSLRecognitionApp {
     constructor() {
         this.isInitialized = false;
@@ -23,8 +33,15 @@ class PSLRecognitionApp {
         this.settings = {
             sensitivity: 0.5,
             frameRate: 18,  // INCREASED from 15 to 18 FPS for faster response
-            language: 'urdu'
+            language: 'urdu',
+            // Audio/Visual settings
+            soundEnabled: true,
+            ttsEnabled: false,
+            darkMode: false
         };
+        
+        // Load saved preferences from localStorage
+        this.loadUserPreferences();
         this.frameIntervalMs = 1000 / this.settings.frameRate;
         this.lastFrameSentAt = 0;
         this.lastDisplayedPrediction = null;
@@ -45,6 +62,22 @@ class PSLRecognitionApp {
         this.wordFormation = null;  // NEW: Word formation from letters
         this.visualizer = null;
         this.ui = null;
+        
+        // Analytics components
+        this.sessionTracker = null;
+        this.analyticsPanel = null;
+        
+        // Performance & Debug (NEW!)
+        this.performanceMetrics = null;
+        this.modelVersionChecker = null;
+        this.sessionRecorder = null;
+        this.offlineChecker = null;
+        
+        // Innovation modules
+        this.practiceMode = null;
+        this.disambiguator = null;
+        this.wordShortcuts = null;
+        this.pipMode = null;
         
         // DOM Elements
         this.elements = {};
@@ -84,6 +117,27 @@ class PSLRecognitionApp {
             // Initialize camera (MediaPipe runs in browser)
             this.updateLoadingMessage('Initializing camera...');
             this.camera = new CameraManager();
+            
+            // Set up MediaPipe error handler
+            this.camera.on('error', (error) => {
+                this.handleCameraError(error);
+            });
+            
+            // Set up MediaPipe warning handler
+            this.camera.on('mediapipe_warning', (data) => {
+                this.showMediaPipeWarning(data);
+            });
+            
+            // Set up MediaPipe loading handler
+            this.camera.on('mediapipe_loading', (data) => {
+                this.updateLoadingMessage(data.message);
+            });
+            
+            // FIXED: Set up MediaPipe recovery handler to show user feedback
+            this.camera.on('mediapipe_recovery', (data) => {
+                this.handleMediaPipeRecovery(data);
+            });
+            
             const cameraReady = await this.camera.init();
             if (!cameraReady) {
                 throw new Error('Camera initialization failed');
@@ -178,6 +232,12 @@ class PSLRecognitionApp {
             
             this.wordFormation.onWordComplete = (data) => {
                 this.showNotification(`Word complete: ${data.word}`, 'success');
+                this.playSound('word');
+                
+                // Speak the completed word if TTS is enabled
+                if (this.settings.ttsEnabled && data.word) {
+                    this.speak(data.word, 'ur-PK');
+                }
             };
             
             this.wordFormation.onSentenceUpdate = (data) => {
@@ -195,8 +255,43 @@ class PSLRecognitionApp {
             this.visualizer = new HandVisualizer();
             await this.visualizer.init();
             
+            // Initialize analytics
+            this.updateLoadingMessage('Setting up analytics...');
+            this.sessionTracker = new SessionTracker();
+            this.analyticsPanel = new AnalyticsPanel({
+                sessionTracker: this.sessionTracker,
+                feedbackManager: this.feedbackManager,
+                updateIntervalMs: 1000
+            });
+            this.analyticsPanel.init();
+            
+            // Initialize Performance & Debug modules (NEW!)
+            this.updateLoadingMessage('Setting up performance monitoring...');
+            this.performanceMetrics = new PerformanceMetrics();
+            this.performanceMetrics.init();
+            
+            this.modelVersionChecker = new ModelVersionChecker();
+            await this.modelVersionChecker.init();
+            
+            this.sessionRecorder = new SessionRecorder();
+            
+            this.offlineChecker = new OfflineStatusChecker();
+            this.offlineChecker.init();
+            this.offlineChecker.onStatusChange = (status) => this.updateOfflineStatus(status);
+            
+            // Initial status updates
+            this.updateModelVersionUI();
+            this.updateOfflineStatusUI();
+            
+            // Initialize Innovation Modules
+            this.updateLoadingMessage('Loading innovation features...');
+            await this.initInnovationModules();
+            
             // Set up event listeners
             this.setupEventListeners();
+            
+            // Apply saved user preferences (theme, sound, TTS)
+            this.applyUserPreferences();
             
             // Hide loading overlay
             this.hideLoadingOverlay();
@@ -259,6 +354,43 @@ class PSLRecognitionApp {
             loadingOverlay: document.getElementById('loadingOverlay'),
             notificationContainer: document.getElementById('notificationContainer'),
             
+            // Error Overlays (Production-Ready)
+            mediapipeErrorOverlay: document.getElementById('mediapipeErrorOverlay'),
+            mediapipeErrorMessage: document.getElementById('mediapipeErrorMessage'),
+            mediapipeRetryBtn: document.getElementById('mediapipeRetryBtn'),
+            modelStatusOverlay: document.getElementById('modelStatusOverlay'),
+            modelStatusText: document.getElementById('modelStatusText'),
+            modelStatusProgress: document.getElementById('modelStatusProgress'),
+            modelRetryBtn: document.getElementById('modelRetryBtn'),
+            
+            // Camera Error Modal
+            cameraErrorModal: document.getElementById('cameraErrorModal'),
+            cameraErrorMessage: document.getElementById('cameraErrorMessage'),
+            retryCameraBtn: document.getElementById('retryCameraBtn'),
+            
+            // Performance Metrics (NEW!)
+            perfFps: document.getElementById('perfFps'),
+            perfInference: document.getElementById('perfInference'),
+            perfMediapipe: document.getElementById('perfMediapipe'),
+            perfMemory: document.getElementById('perfMemory'),
+            perfChartCanvas: document.getElementById('perfChartCanvas'),
+            
+            // Offline & Model Status (NEW!)
+            offlineIndicator: document.getElementById('offlineIndicator'),
+            offlineStatus: document.getElementById('offlineStatus'),
+            modelIndicator: document.getElementById('modelIndicator'),
+            modelVersion: document.getElementById('modelVersion'),
+            updateAvailable: document.getElementById('updateAvailable'),
+            updateModelBtn: document.getElementById('updateModelBtn'),
+            
+            // Session Recording (NEW!)
+            recordToggleBtn: document.getElementById('recordToggleBtn'),
+            recordIcon: document.getElementById('recordIcon'),
+            recordText: document.getElementById('recordText'),
+            recordingTime: document.getElementById('recordingTime'),
+            recordingFrames: document.getElementById('recordingFrames'),
+            exportRecordingBtn: document.getElementById('exportRecordingBtn'),
+            
             // Word Formation Elements
             sentenceDisplay: document.getElementById('sentenceDisplay'),
             currentWordDisplay: document.getElementById('currentWordDisplay'),
@@ -273,7 +405,16 @@ class PSLRecognitionApp {
             
             // Letter History Elements
             letterHistoryList: document.getElementById('letterHistoryList'),
-            clearLettersBtn: document.getElementById('clearLettersBtn')
+            clearLettersBtn: document.getElementById('clearLettersBtn'),
+            
+            // Toggle Buttons (Theme, Sound, TTS)
+            themeToggle: document.getElementById('themeToggle'),
+            themeIcon: document.getElementById('themeIcon'),
+            soundToggle: document.getElementById('soundToggle'),
+            soundIcon: document.getElementById('soundIcon'),
+            ttsToggle: document.getElementById('ttsToggle'),
+            ttsIcon: document.getElementById('ttsIcon'),
+            speakTextBtn: document.getElementById('speakTextBtn')
         };
         
         // Letter history tracking
@@ -283,6 +424,119 @@ class PSLRecognitionApp {
         // Debug: Log if letter history elements are found
         console.log('[DOM] letterHistoryList found:', !!this.elements.letterHistoryList);
         console.log('[DOM] clearLettersBtn found:', !!this.elements.clearLettersBtn);
+    }
+    
+    /**
+     * Initialize all innovation modules (Practice, Disambiguation, Shortcuts, PiP)
+     */
+    async initInnovationModules() {
+        try {
+            // 1. Practice Mode
+            if (typeof PracticeMode !== 'undefined') {
+                this.practiceMode = new PracticeMode({
+                    imagesBasePath: 'assets/signs/',
+                    manifestPath: 'assets/signs/manifest.json',
+                    targetHoldTimeMs: 2000
+                });
+                await this.practiceMode.init();
+                
+                // Set weak signs from feedback data
+                if (this.feedbackManager) {
+                    const confusionMatrix = this.feedbackManager.getConfusionMatrix();
+                    this.practiceMode.analyzeWeakSigns(confusionMatrix);
+                }
+                
+                // Practice mode success callback
+                this.practiceMode.onSuccess = (data) => {
+                    this.showNotification(`✓ Correct! Streak: ${data.streak}`, 'success');
+                    this.playSound('success');
+                };
+                
+                console.log('[Innovation] Practice Mode initialized');
+            }
+            
+            // 2. Disambiguation
+            if (typeof SignDisambiguator !== 'undefined') {
+                this.disambiguator = new SignDisambiguator({
+                    imagesBasePath: 'assets/signs/',
+                    ambiguityThreshold: 0.15,
+                    maxAlternatives: 3,
+                    autoDismissMs: 8000
+                });
+                this.disambiguator.init();
+                
+                // Update confusion pairs from feedback
+                if (this.feedbackManager) {
+                    const confusionMatrix = this.feedbackManager.getConfusionMatrix();
+                    this.disambiguator.updateConfusionPairs(confusionMatrix);
+                }
+                
+                // Selection callback
+                this.disambiguator.onSelection = (data) => {
+                    // User selected a different sign - use that instead
+                    if (data.selected !== this.lastDisplayedPrediction) {
+                        this.displayPrediction(data.selected, data.confidence);
+                        if (this.wordFormation) {
+                            this.wordFormation.processPrediction({
+                                label: data.selected,
+                                confidence: data.confidence,
+                                timestamp: Date.now()
+                            });
+                        }
+                    }
+                };
+                
+                console.log('[Innovation] Disambiguation initialized');
+            }
+            
+            // 3. Word Shortcuts
+            if (typeof WordShortcuts !== 'undefined') {
+                this.wordShortcuts = new WordShortcuts({
+                    maxCustomShortcuts: 20
+                });
+                await this.wordShortcuts.init();
+                
+                // Word insert callback
+                this.wordShortcuts.onWordInsert = (data) => {
+                    if (this.wordFormation) {
+                        // Insert the word directly into the sentence
+                        this.wordFormation.insertWord(data.urdu);
+                        this.showNotification(`Added: ${data.urdu}`, 'success');
+                        this.playSound('word');
+                    }
+                };
+                
+                console.log('[Innovation] Word Shortcuts initialized');
+            }
+            
+            // 4. PiP Mode
+            if (typeof PiPMode !== 'undefined') {
+                this.pipMode = new PiPMode({
+                    defaultPosition: 'bottom-right'
+                });
+                // FIXED: Use correct element IDs from index_browser.html
+                const videoEl = document.getElementById('webcam');
+                const canvasEl = document.getElementById('overlay-canvas');
+                this.pipMode.init(videoEl, canvasEl);
+                
+                // Toggle recognition callback
+                this.pipMode.setToggleCallback(() => {
+                    if (this.isRecognitionActive) {
+                        this.stopRecognition();
+                    } else {
+                        this.startRecognition();
+                    }
+                });
+                
+                console.log('[Innovation] PiP Mode initialized');
+            }
+            
+            console.log('[Innovation] All modules initialized successfully');
+            
+        } catch (error) {
+            console.warn('[Innovation] Error initializing modules:', error);
+            // Don't fail - innovation modules are optional enhancements
+        }
     }
     
     setupEventListeners() {
@@ -367,6 +621,201 @@ class PSLRecognitionApp {
                 this.clearLetterHistory();
             });
         }
+        
+        // Theme Toggle
+        if (this.elements.themeToggle) {
+            this.elements.themeToggle.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+        
+        // Sound Toggle
+        if (this.elements.soundToggle) {
+            this.elements.soundToggle.addEventListener('click', () => {
+                this.toggleSound();
+            });
+        }
+        
+        // TTS Toggle
+        if (this.elements.ttsToggle) {
+            this.elements.ttsToggle.addEventListener('click', () => {
+                this.toggleTTS();
+            });
+        }
+        
+        // Speak Text Button
+        if (this.elements.speakTextBtn) {
+            this.elements.speakTextBtn.addEventListener('click', () => {
+                this.speakCurrentText();
+            });
+        }
+        
+        // Analytics Toggle
+        const analyticsToggle = document.getElementById('analyticsToggle');
+        const analyticsClose = document.getElementById('analyticsClose');
+        
+        if (analyticsToggle) {
+            analyticsToggle.addEventListener('click', () => {
+                if (this.analyticsPanel) {
+                    this.analyticsPanel.toggle();
+                    analyticsToggle.classList.toggle('active', this.analyticsPanel.isVisible);
+                }
+            });
+        }
+        
+        if (analyticsClose) {
+            analyticsClose.addEventListener('click', () => {
+                if (this.analyticsPanel) {
+                    this.analyticsPanel.hide();
+                    if (analyticsToggle) {
+                        analyticsToggle.classList.remove('active');
+                    }
+                }
+            });
+        }
+        
+        // Innovation Module Toggles
+        this.setupInnovationListeners();
+        
+        // Error Recovery Buttons
+        this.setupErrorRecoveryListeners();
+    }
+    
+    /**
+     * Set up event listeners for error recovery buttons
+     */
+    setupErrorRecoveryListeners() {
+        // MediaPipe retry button
+        if (this.elements.mediapipeRetryBtn) {
+            this.elements.mediapipeRetryBtn.addEventListener('click', () => {
+                this.retryMediaPipe();
+            });
+        }
+        
+        // Model retry button
+        if (this.elements.modelRetryBtn) {
+            this.elements.modelRetryBtn.addEventListener('click', () => {
+                this.retryModelLoading();
+            });
+        }
+        
+        // Camera retry button
+        if (this.elements.retryCameraBtn) {
+            this.elements.retryCameraBtn.addEventListener('click', () => {
+                this.retryCamera();
+            });
+        }
+        
+        // Close camera error modal by clicking outside
+        if (this.elements.cameraErrorModal) {
+            this.elements.cameraErrorModal.addEventListener('click', (e) => {
+                if (e.target === this.elements.cameraErrorModal) {
+                    this.hideCameraErrorModal();
+                }
+            });
+        }
+        
+        // Recording controls (NEW!)
+        if (this.elements.recordToggleBtn) {
+            this.elements.recordToggleBtn.addEventListener('click', () => {
+                this.toggleRecording();
+            });
+        }
+        
+        if (this.elements.exportRecordingBtn) {
+            this.elements.exportRecordingBtn.addEventListener('click', () => {
+                this.exportRecording();
+            });
+        }
+        
+        // Model update button (NEW!)
+        if (this.elements.updateModelBtn) {
+            this.elements.updateModelBtn.addEventListener('click', () => {
+                this.showNotification('Model updates coming soon!', 'info');
+            });
+        }
+    }
+    
+    /**
+     * Set up event listeners for innovation modules
+     */
+    setupInnovationListeners() {
+        // Practice Mode Toggle
+        const practiceToggle = document.getElementById('practiceToggle');
+        const practiceClose = document.getElementById('practiceClose');
+        const practiceSkip = document.getElementById('practiceSkip');
+        const practiceWeakSigns = document.getElementById('practiceWeakSigns');
+        const practiceRandom = document.getElementById('practiceRandom');
+        
+        if (practiceToggle) {
+            practiceToggle.addEventListener('click', () => {
+                if (this.practiceMode) {
+                    this.practiceMode.toggle();
+                    practiceToggle.classList.toggle('active', this.practiceMode.isActive);
+                }
+            });
+        }
+        
+        if (practiceClose) {
+            practiceClose.addEventListener('click', () => {
+                if (this.practiceMode) {
+                    this.practiceMode.stop();
+                    if (practiceToggle) practiceToggle.classList.remove('active');
+                }
+            });
+        }
+        
+        if (practiceSkip) {
+            practiceSkip.addEventListener('click', () => {
+                if (this.practiceMode) this.practiceMode.onSignSkip();
+            });
+        }
+        
+        if (practiceWeakSigns) {
+            practiceWeakSigns.addEventListener('click', () => {
+                if (this.practiceMode) this.practiceMode.selectWeakSign();
+            });
+        }
+        
+        if (practiceRandom) {
+            practiceRandom.addEventListener('click', () => {
+                if (this.practiceMode) this.practiceMode.selectRandomSign();
+            });
+        }
+        
+        // Word Shortcuts Toggle
+        const shortcutsToggle = document.getElementById('shortcutsToggle');
+        const shortcutsClose = document.getElementById('shortcutsClose');
+        
+        if (shortcutsToggle) {
+            shortcutsToggle.addEventListener('click', () => {
+                if (this.wordShortcuts) {
+                    this.wordShortcuts.toggle();
+                    shortcutsToggle.classList.toggle('active', this.wordShortcuts.isVisible);
+                }
+            });
+        }
+        
+        if (shortcutsClose) {
+            shortcutsClose.addEventListener('click', () => {
+                if (this.wordShortcuts) {
+                    this.wordShortcuts.hide();
+                    if (shortcutsToggle) shortcutsToggle.classList.remove('active');
+                }
+            });
+        }
+        
+        // PiP Mode Toggle
+        const pipToggle = document.getElementById('pipToggle');
+        
+        if (pipToggle) {
+            pipToggle.addEventListener('click', async () => {
+                if (this.pipMode) {
+                    await this.pipMode.toggle();
+                    pipToggle.classList.toggle('active', this.pipMode.isActive);
+                }
+            });
+        }
     }
     
     setupKeyboardShortcuts() {
@@ -446,13 +895,18 @@ class PSLRecognitionApp {
         }
         
         try {
-            console.log('Starting recognition (Browser-Only Mode)...');
+            debugLog('Starting recognition (Browser-Only Mode)...');
             
             // Reset state
             this.lastDisplayedPrediction = null;
             this.lastDisplayedConfidence = 0;
             this.lastFrameSentAt = 0;
             this.predictor.clearBuffer();
+            
+            // Start session tracking for analytics
+            if (this.sessionTracker) {
+                this.sessionTracker.startSession();
+            }
             
             // Start camera
             const cameraStarted = await this.camera.start();
@@ -476,6 +930,11 @@ class PSLRecognitionApp {
             // Start prediction loop
             this.startPredictionLoop();
             
+            // FIXED: Restart word formation pause detection when recognition starts
+            if (this.wordFormation) {
+                this.wordFormation.startPauseDetection();
+            }
+            
             // Update UI
             this.elements.startBtn.disabled = true;
             this.elements.stopBtn.disabled = false;
@@ -484,7 +943,7 @@ class PSLRecognitionApp {
             // Clear previous prediction
             this.clearPredictionDisplay();
             
-            console.log('[OK] Recognition started');
+            debugLog('[OK] Recognition started');
             this.showNotification('Recognition started', 'success');
             
         } catch (error) {
@@ -499,7 +958,7 @@ class PSLRecognitionApp {
         }
         
         try {
-            console.log('Stopping recognition...');
+            debugLog('Stopping recognition...');
             
             // Stop camera
             this.camera.stop();
@@ -526,6 +985,11 @@ class PSLRecognitionApp {
                 this.visualizer.clear();
             }
             
+            // FIXED: Stop word formation pause detection to save resources
+            if (this.wordFormation) {
+                this.wordFormation.stopPauseDetection();
+            }
+            
             // Update UI
             this.isRecognitionActive = false;
             this.elements.startBtn.disabled = false;
@@ -535,7 +999,7 @@ class PSLRecognitionApp {
             // Hide feedback buttons
             this.hideFeedbackSection();
             
-            console.log('[OK] Recognition stopped');
+            debugLog('[OK] Recognition stopped');
             this.showNotification('Recognition stopped', 'info');
             
         } catch (error) {
@@ -546,7 +1010,7 @@ class PSLRecognitionApp {
     
     resetSystem() {
         try {
-            console.log('Resetting system...');
+            debugLog('Resetting system...');
             
             // Reset state
             this.lastDisplayedPrediction = null;
@@ -618,6 +1082,15 @@ class PSLRecognitionApp {
             
             // Add frame to predictor buffer
             if (data.hasHands && data.landmarks) {
+                // DEAD-ZONE FILTER: Skip if hand is in bottom 20% of screen (transitioning)
+                // Wrist Y coordinate is at index 1 (x=0, y=1, z=2 for first landmark)
+                const wristY = data.landmarks[1];
+                if (wristY > 0.80) {
+                    // Hand is in "dead zone" (bottom of screen) - likely transitioning
+                    // Don't add to buffer to prevent phantom predictions
+                    return;
+                }
+                
                 this.predictor.addFrame(data.landmarks);
                 this.currentLandmarkSequence = this.predictor.getCurrentSequence();
                 
@@ -716,12 +1189,17 @@ class PSLRecognitionApp {
             console.error('Prediction error:', result.error);
         }
         
-        // Update FPS (use prediction time for more accurate reading)
+        // FIXED: Update FPS using actual camera stats, not inference rate
+        if (this.camera && this.camera.cameraStats) {
+            const cameraStats = this.camera.cameraStats;
+            // Use actual frames processed by camera, not inference rate
+            const actualFps = cameraStats.isActive ? this.settings.frameRate : 0;
+            this.updateFPS(actualFps);
+        }
+        
+        // Update performance metrics (NEW!)
         if (result.predictionTimeMs) {
-            const inferenceRate = 1000 / result.predictionTimeMs;
-            // Blend with actual camera FPS for display
-            const displayFps = Math.min(inferenceRate, this.settings.frameRate);
-            this.updateFPS(Math.round(displayFps));
+            this.updatePerformanceMetrics(result.predictionTimeMs, result.mediapipeTimeMs || null);
         }
     }
     
@@ -729,7 +1207,25 @@ class PSLRecognitionApp {
      * Handle new stable prediction (triggered by predictor callback)
      */
     handleNewPrediction(prediction) {
-        console.log('New prediction:', prediction);
+        debugLog('New prediction:', prediction);
+        
+        // Track prediction in analytics
+        if (this.sessionTracker) {
+            this.sessionTracker.recordPrediction(prediction.label, prediction.confidence);
+        }
+        
+        // Record for debugging if recording is active (NEW!)
+        this.recordPredictionFrame(prediction, this.currentLandmarkSequence);
+        
+        // Check for disambiguation (low confidence or ambiguous predictions)
+        if (this.disambiguator && prediction.allPredictions && prediction.allPredictions.length >= 2) {
+            const wasAmbiguous = this.disambiguator.checkAmbiguity(prediction.allPredictions);
+            if (wasAmbiguous) {
+                // Disambiguation UI shown - wait for user selection
+                console.log('[Disambiguation] Showing options for ambiguous prediction');
+                return; // Don't process further until user selects
+            }
+        }
         
         // Update prediction display
         this.displayPrediction(prediction.label, prediction.confidence);
@@ -744,6 +1240,19 @@ class PSLRecognitionApp {
                 confidence: prediction.confidence,
                 timestamp: Date.now()
             });
+        }
+        
+        // Feed to practice mode if active
+        if (this.practiceMode && this.practiceMode.isActive) {
+            this.practiceMode.processPrediction({
+                label: prediction.label,
+                confidence: prediction.confidence
+            });
+        }
+        
+        // Update PiP display if active
+        if (this.pipMode && this.pipMode.isActive) {
+            this.pipMode.updatePrediction(prediction.label, prediction.confidence);
         }
         
         // Show feedback section
@@ -764,6 +1273,14 @@ class PSLRecognitionApp {
     displayPrediction(label, confidence) {
         if (this.ui) {
             this.ui.updatePrediction(label, confidence);
+        }
+        
+        // Play sound effect for new letter recognition
+        if (label !== this.lastDisplayedPrediction) {
+            this.playSound('letter');
+            
+            // Auto-speak the sign if TTS is enabled
+            this.speakSign(label);
         }
         
         this.lastDisplayedPrediction = label;
@@ -878,6 +1395,11 @@ class PSLRecognitionApp {
         }
         
         console.log(`Feedback: ${this.lastDisplayedPrediction} = ${isCorrect ? 'Correct' : 'Incorrect'}`);
+        
+        // Track feedback in analytics
+        if (this.sessionTracker) {
+            this.sessionTracker.recordFeedback(this.lastDisplayedPrediction, isCorrect);
+        }
         
         if (isCorrect) {
             // Record correct feedback
@@ -1535,6 +2057,730 @@ class PSLRecognitionApp {
         }
     }
     
+    // ================== THEME, SOUND & TTS ==================
+    
+    /**
+     * Load saved user preferences from localStorage
+     */
+    loadUserPreferences() {
+        try {
+            const saved = localStorage.getItem('psl_user_preferences');
+            if (saved) {
+                const prefs = JSON.parse(saved);
+                this.settings.soundEnabled = prefs.soundEnabled ?? true;
+                this.settings.ttsEnabled = prefs.ttsEnabled ?? false;
+                this.settings.darkMode = prefs.darkMode ?? false;
+            }
+        } catch (e) {
+            console.warn('Could not load user preferences:', e);
+        }
+    }
+    
+    /**
+     * Save user preferences to localStorage
+     */
+    saveUserPreferences() {
+        try {
+            localStorage.setItem('psl_user_preferences', JSON.stringify({
+                soundEnabled: this.settings.soundEnabled,
+                ttsEnabled: this.settings.ttsEnabled,
+                darkMode: this.settings.darkMode
+            }));
+        } catch (e) {
+            console.warn('Could not save user preferences:', e);
+        }
+    }
+    
+    /**
+     * Apply saved preferences to UI after DOM is ready
+     */
+    applyUserPreferences() {
+        // Apply dark mode
+        if (this.settings.darkMode) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            if (this.elements.themeIcon) this.elements.themeIcon.textContent = '☀️';
+            if (this.elements.themeToggle) this.elements.themeToggle.classList.add('active');
+        }
+        
+        // Apply sound toggle state
+        if (this.elements.soundToggle) {
+            this.elements.soundToggle.classList.toggle('active', this.settings.soundEnabled);
+            if (this.elements.soundIcon) {
+                this.elements.soundIcon.textContent = this.settings.soundEnabled ? '🔊' : '🔇';
+            }
+        }
+        
+        // Apply TTS toggle state
+        if (this.elements.ttsToggle) {
+            this.elements.ttsToggle.classList.toggle('active', this.settings.ttsEnabled);
+            if (this.elements.ttsIcon) {
+                this.elements.ttsIcon.textContent = this.settings.ttsEnabled ? '🗣️' : '🤐';
+            }
+        }
+    }
+    
+    /**
+     * Toggle dark/light theme
+     */
+    toggleTheme() {
+        this.settings.darkMode = !this.settings.darkMode;
+        
+        if (this.settings.darkMode) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            if (this.elements.themeIcon) this.elements.themeIcon.textContent = '☀️';
+            if (this.elements.themeToggle) this.elements.themeToggle.classList.add('active');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+            if (this.elements.themeIcon) this.elements.themeIcon.textContent = '🌙';
+            if (this.elements.themeToggle) this.elements.themeToggle.classList.remove('active');
+        }
+        
+        this.saveUserPreferences();
+        this.playSound('click');
+    }
+    
+    /**
+     * Toggle sound effects on/off
+     */
+    toggleSound() {
+        this.settings.soundEnabled = !this.settings.soundEnabled;
+        
+        if (this.elements.soundToggle) {
+            this.elements.soundToggle.classList.toggle('active', this.settings.soundEnabled);
+        }
+        if (this.elements.soundIcon) {
+            this.elements.soundIcon.textContent = this.settings.soundEnabled ? '🔊' : '🔇';
+        }
+        
+        this.saveUserPreferences();
+        
+        // Play confirmation sound if enabling
+        if (this.settings.soundEnabled) {
+            this.playSound('click');
+        }
+    }
+    
+    /**
+     * Toggle text-to-speech auto-speak on/off
+     */
+    toggleTTS() {
+        this.settings.ttsEnabled = !this.settings.ttsEnabled;
+        
+        if (this.elements.ttsToggle) {
+            this.elements.ttsToggle.classList.toggle('active', this.settings.ttsEnabled);
+        }
+        if (this.elements.ttsIcon) {
+            this.elements.ttsIcon.textContent = this.settings.ttsEnabled ? '🗣️' : '🤐';
+        }
+        
+        this.saveUserPreferences();
+        this.playSound('click');
+        
+        // Announce state change
+        if (this.settings.ttsEnabled) {
+            this.speak('Auto-speak enabled');
+        }
+    }
+    
+    /**
+     * Play a sound effect
+     * @param {string} type - Type of sound: 'success', 'error', 'click', 'letter'
+     */
+    playSound(type) {
+        if (!this.settings.soundEnabled) return;
+        
+        // Create audio context on demand (for mobile compatibility)
+        if (!this._audioContext) {
+            try {
+                this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('Web Audio API not supported');
+                return;
+            }
+        }
+        
+        const ctx = this._audioContext;
+        
+        // Resume audio context if suspended (mobile browsers require this after user interaction)
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(e => console.warn('Could not resume audio context:', e));
+        }
+        const now = ctx.currentTime;
+        
+        // Create oscillator for simple sound effects
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        switch (type) {
+            case 'success':
+                // Pleasant ascending tone
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.linearRampToValueAtTime(660, now + 0.1);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+                
+            case 'error':
+                // Low warning tone
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(150, now + 0.15);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+                
+            case 'click':
+                // Quick click
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+                break;
+                
+            case 'letter':
+                // Soft notification for new letter
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523, now); // C5
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                break;
+                
+            case 'word':
+                // Two-tone word completion sound
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523, now);      // C5
+                osc.frequency.setValueAtTime(659, now + 0.1); // E5
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+        }
+    }
+    
+    /**
+     * Speak text using Web Speech API
+     * @param {string} text - Text to speak
+     * @param {string} lang - Language code (default: 'ur-PK' for Urdu)
+     */
+    speak(text, lang = 'en-US') {
+        if (!text || !window.speechSynthesis) return;
+        
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.8;
+        
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    /**
+     * Speak the currently formed sentence/word
+     */
+    speakCurrentText() {
+        if (!this.wordFormation) {
+            this.showNotification('No text to speak', 'warning');
+            return;
+        }
+        
+        const text = this.wordFormation.getFullDisplayText();
+        if (!text || text.trim() === '') {
+            this.showNotification('No text to speak', 'warning');
+            return;
+        }
+        
+        // Speak in Urdu
+        this.speak(text, 'ur-PK');
+        this.showNotification('Speaking text...', 'info');
+    }
+    
+    /**
+     * Auto-speak a recognized sign (if TTS is enabled)
+     * @param {string} sign - The recognized sign label
+     */
+    speakSign(sign) {
+        if (!this.settings.ttsEnabled || !sign) return;
+        
+        // Speak the romanized label in English
+        this.speak(sign, 'en-US');
+    }
+    
+    // ================== ERROR HANDLING (Production-Ready) ==================
+    
+    /**
+     * Handle camera errors (permission denied, not found, etc.)
+     * FIXED: Now handles classified error objects from camera.js for better UX
+     */
+    handleCameraError(error) {
+        console.error('[Camera Error]', error);
+        
+        // Check if this is a classified error from our improved camera.js
+        if (error.type) {
+            // Use the classified error information
+            const message = error.message;
+            const userAction = error.userAction;
+            
+            // Handle MediaPipe recovery exhausted
+            if (error.type === 'mediapipe_recovery' || error.code === 'RECOVERY_EXHAUSTED') {
+                this.showMediaPipeError(message || 'MediaPipe stopped responding');
+                return;
+            }
+            
+            // Show modal for actionable errors
+            if (error.canRetry) {
+                this.showCameraErrorModal(`${message}\n\n${userAction}`);
+            } else {
+                this.showNotification(message, 'error');
+            }
+            return;
+        }
+        
+        // Legacy handling for unclassified errors
+        let message = 'Camera error occurred. Please try again.';
+        let showModal = false;
+        
+        if (error.message) {
+            const errorMsg = error.message.toLowerCase();
+            
+            if (errorMsg.includes('permission') || errorMsg.includes('denied') || errorMsg.includes('notallowed')) {
+                message = 'Camera access was denied. Please allow camera permissions to use sign language recognition.';
+                showModal = true;
+            } else if (errorMsg.includes('notfound') || errorMsg.includes('no camera')) {
+                message = 'No camera found. Please connect a camera and try again.';
+                showModal = true;
+            } else if (errorMsg.includes('mediapipe') || error.code === 'RECOVERY_EXHAUSTED') {
+                this.showMediaPipeError(error.message || 'MediaPipe stopped responding');
+                return;
+            }
+        }
+        
+        if (showModal) {
+            this.showCameraErrorModal(message);
+        } else {
+            this.showNotification(message, 'error');
+        }
+    }
+    
+    /**
+     * Show camera error modal with browser-specific instructions
+     */
+    showCameraErrorModal(message) {
+        if (this.elements.cameraErrorMessage) {
+            this.elements.cameraErrorMessage.textContent = message;
+        }
+        
+        if (this.elements.cameraErrorModal) {
+            this.elements.cameraErrorModal.style.display = 'flex';
+            
+            // Detect browser and show appropriate instructions
+            const ua = navigator.userAgent.toLowerCase();
+            const isChrome = ua.includes('chrome') && !ua.includes('edg');
+            const isEdge = ua.includes('edg');
+            const isFirefox = ua.includes('firefox');
+            const isSafari = ua.includes('safari') && !ua.includes('chrome');
+            const isMobile = /android|iphone|ipad|ipod/.test(ua);
+            
+            // Show browser-specific instructions
+            const chromeInst = document.getElementById('chromeInstructions');
+            const firefoxInst = document.getElementById('firefoxInstructions');
+            const safariInst = document.getElementById('safariInstructions');
+            const mobileInst = document.getElementById('mobileInstructions');
+            
+            // Hide all first
+            [chromeInst, firefoxInst, safariInst, mobileInst].forEach(el => {
+                if (el) el.style.display = 'none';
+            });
+            
+            // Show relevant one
+            if (isMobile && mobileInst) {
+                mobileInst.style.display = 'block';
+            } else if (isSafari && safariInst) {
+                safariInst.style.display = 'block';
+            } else if (isFirefox && firefoxInst) {
+                firefoxInst.style.display = 'block';
+            } else if (chromeInst) {
+                chromeInst.style.display = 'block';
+            }
+        }
+    }
+    
+    /**
+     * Hide camera error modal
+     */
+    hideCameraErrorModal() {
+        if (this.elements.cameraErrorModal) {
+            this.elements.cameraErrorModal.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Show MediaPipe error overlay on video
+     */
+    showMediaPipeError(message) {
+        if (this.elements.mediapipeErrorOverlay) {
+            this.elements.mediapipeErrorOverlay.style.display = 'flex';
+        }
+        if (this.elements.mediapipeErrorMessage) {
+            this.elements.mediapipeErrorMessage.textContent = message;
+        }
+        this.updateSystemStatus('Error');
+    }
+    
+    /**
+     * Hide MediaPipe error overlay
+     */
+    hideMediaPipeError() {
+        if (this.elements.mediapipeErrorOverlay) {
+            this.elements.mediapipeErrorOverlay.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Show MediaPipe warning (non-blocking)
+     */
+    showMediaPipeWarning(data) {
+        console.warn('[MediaPipe Warning]', data);
+        
+        // Show subtle warning after multiple errors
+        if (data.consecutiveErrors >= 5) {
+            this.showNotification('Hand detection experiencing issues. Try moving your hand.', 'warning');
+        }
+    }
+    
+    /**
+     * FIXED: Handle MediaPipe recovery events to show user feedback
+     */
+    handleMediaPipeRecovery(data) {
+        debugLog('[MediaPipe Recovery]', data);
+        
+        switch (data.status) {
+            case 'started':
+                // Show recovery in progress
+                this.updateSystemStatus(`Recovering... (${data.attempt}/${data.maxAttempts})`);
+                this.showNotification(data.message, 'warning');
+                break;
+                
+            case 'success':
+                // Recovery succeeded
+                this.updateSystemStatus('Active');
+                this.showNotification(data.message, 'success');
+                break;
+                
+            case 'failed':
+                // Recovery failed
+                this.updateSystemStatus('Error');
+                this.showNotification(data.message, 'error');
+                // Show the MediaPipe error overlay for manual retry
+                this.showMediaPipeError(data.message);
+                break;
+        }
+    }
+    
+    /**
+     * Show model loading status overlay
+     */
+    showModelStatus(message, showRetry = false) {
+        if (this.elements.modelStatusOverlay) {
+            this.elements.modelStatusOverlay.style.display = 'flex';
+        }
+        if (this.elements.modelStatusText) {
+            this.elements.modelStatusText.textContent = message;
+        }
+        if (this.elements.modelRetryBtn) {
+            this.elements.modelRetryBtn.style.display = showRetry ? 'inline-flex' : 'none';
+        }
+    }
+    
+    /**
+     * Hide model status overlay
+     */
+    hideModelStatus() {
+        if (this.elements.modelStatusOverlay) {
+            this.elements.modelStatusOverlay.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Retry MediaPipe initialization
+     */
+    async retryMediaPipe() {
+        this.hideMediaPipeError();
+        this.showNotification('Retrying hand detection...', 'info');
+        
+        try {
+            if (this.camera) {
+                await this.camera.initMediaPipe();
+                this.showNotification('Hand detection restored!', 'success');
+            }
+        } catch (error) {
+            console.error('MediaPipe retry failed:', error);
+            this.showMediaPipeError('Retry failed. Please refresh the page.');
+        }
+    }
+    
+    /**
+     * Retry ONNX model loading
+     */
+    async retryModelLoading() {
+        this.showModelStatus('Retrying model load...');
+        
+        try {
+            const success = await this.predictor.init(
+                'models/psl_model_v2.onnx',
+                'models/psl_labels.json',
+                'models/sign_thresholds.json'
+            );
+            
+            if (success) {
+                this.hideModelStatus();
+                this.showNotification('AI model loaded successfully!', 'success');
+            } else {
+                this.showModelStatus('Model loading failed. Please refresh.', true);
+            }
+        } catch (error) {
+            console.error('Model retry failed:', error);
+            this.showModelStatus('Model loading failed: ' + error.message, true);
+        }
+    }
+    
+    /**
+     * Retry camera access
+     */
+    async retryCamera() {
+        this.hideCameraErrorModal();
+        this.showNotification('Requesting camera access...', 'info');
+        
+        try {
+            const cameraReady = await this.camera.init();
+            if (cameraReady) {
+                this.showNotification('Camera initialized!', 'success');
+            } else {
+                this.showCameraErrorModal('Camera initialization failed. Please check permissions.');
+            }
+        } catch (error) {
+            console.error('Camera retry failed:', error);
+            this.handleCameraError(error);
+        }
+    }
+    
+    // ================== PERFORMANCE METRICS & STATUS (NEW!) ==================
+    
+    /**
+     * Update performance metrics UI
+     */
+    updatePerformanceMetrics(inferenceTime = null, mediapipeTime = null) {
+        if (!this.performanceMetrics) return;
+        
+        // Record frame for FPS
+        this.performanceMetrics.recordFrame();
+        
+        // Record timing data
+        if (inferenceTime !== null) {
+            this.performanceMetrics.recordInferenceTime(inferenceTime);
+        }
+        if (mediapipeTime !== null) {
+            this.performanceMetrics.recordMediapipeTime(mediapipeTime);
+        }
+        
+        // Update UI elements
+        if (this.elements.perfFps) {
+            const fps = this.performanceMetrics.fps;
+            this.elements.perfFps.textContent = fps;
+            this.elements.perfFps.className = `perf-value ${this.performanceMetrics.getFpsClass()}`;
+        }
+        
+        if (this.elements.perfInference) {
+            this.elements.perfInference.textContent = `${Math.round(this.performanceMetrics.currentInferenceTime)}ms`;
+            this.elements.perfInference.className = `perf-value ${this.performanceMetrics.getInferenceClass()}`;
+        }
+        
+        if (this.elements.perfMediapipe) {
+            this.elements.perfMediapipe.textContent = `${Math.round(this.performanceMetrics.currentMediapipeTime)}ms`;
+        }
+        
+        if (this.elements.perfMemory) {
+            this.elements.perfMemory.textContent = this.performanceMetrics.getMemoryUsage();
+        }
+        
+        // Update chart
+        this.performanceMetrics.renderChart();
+    }
+    
+    /**
+     * Update model version UI
+     */
+    updateModelVersionUI() {
+        if (!this.modelVersionChecker) return;
+        
+        if (this.elements.modelIndicator) {
+            this.elements.modelIndicator.className = 'status-indicator online';
+        }
+        
+        if (this.elements.modelVersion) {
+            this.elements.modelVersion.textContent = `Model: ${this.modelVersionChecker.getVersionString()}`;
+        }
+    }
+    
+    /**
+     * Update offline status UI
+     */
+    updateOfflineStatusUI() {
+        if (!this.offlineChecker) return;
+        
+        const status = this.offlineChecker.getStatus();
+        
+        if (this.elements.offlineIndicator) {
+            this.elements.offlineIndicator.className = `status-indicator ${this.offlineChecker.getStatusClass()}`;
+        }
+        
+        if (this.elements.offlineStatus) {
+            this.elements.offlineStatus.textContent = this.offlineChecker.getStatusText();
+        }
+    }
+    
+    /**
+     * Handle offline status change
+     */
+    updateOfflineStatus(status) {
+        this.updateOfflineStatusUI();
+        
+        if (!status.isOnline && status.offlineReady) {
+            this.showNotification('Working offline - all features available!', 'info');
+        } else if (!status.isOnline && !status.offlineReady) {
+            this.showNotification('No internet connection', 'warning');
+        }
+    }
+    
+    // ================== SESSION RECORDING (NEW!) ==================
+    
+    /**
+     * Toggle session recording
+     */
+    toggleRecording() {
+        if (!this.sessionRecorder) return;
+        
+        if (this.sessionRecorder.isRecording) {
+            this.stopRecording();
+        } else {
+            this.startRecording();
+        }
+    }
+    
+    /**
+     * Start session recording
+     */
+    startRecording() {
+        if (!this.sessionRecorder) return;
+        
+        this.sessionRecorder.start();
+        
+        // Update UI
+        if (this.elements.recordToggleBtn) {
+            this.elements.recordToggleBtn.classList.add('recording');
+        }
+        if (this.elements.recordIcon) {
+            this.elements.recordIcon.textContent = '⏹';
+        }
+        if (this.elements.recordText) {
+            this.elements.recordText.textContent = 'Stop Recording';
+        }
+        if (this.elements.exportRecordingBtn) {
+            this.elements.exportRecordingBtn.style.display = 'none';
+        }
+        
+        // Start recording UI update interval
+        this._recordingUpdateInterval = setInterval(() => {
+            this.updateRecordingUI();
+        }, 500);
+        
+        this.showNotification('Recording started - capturing predictions for debugging', 'info');
+    }
+    
+    /**
+     * Stop session recording
+     */
+    stopRecording() {
+        if (!this.sessionRecorder) return;
+        
+        this.sessionRecorder.stop();
+        
+        // Clear update interval
+        if (this._recordingUpdateInterval) {
+            clearInterval(this._recordingUpdateInterval);
+            this._recordingUpdateInterval = null;
+        }
+        
+        // Update UI
+        if (this.elements.recordToggleBtn) {
+            this.elements.recordToggleBtn.classList.remove('recording');
+        }
+        if (this.elements.recordIcon) {
+            this.elements.recordIcon.textContent = '⏺';
+        }
+        if (this.elements.recordText) {
+            this.elements.recordText.textContent = 'Start Recording';
+        }
+        if (this.elements.exportRecordingBtn) {
+            this.elements.exportRecordingBtn.style.display = 'inline-flex';
+        }
+        
+        this.showNotification(`Recording stopped - ${this.sessionRecorder.recordedFrames.length} frames captured`, 'success');
+    }
+    
+    /**
+     * Update recording UI with current status
+     */
+    updateRecordingUI() {
+        if (!this.sessionRecorder) return;
+        
+        if (this.elements.recordingTime) {
+            this.elements.recordingTime.textContent = this.sessionRecorder.getDuration();
+        }
+        if (this.elements.recordingFrames) {
+            this.elements.recordingFrames.textContent = `${this.sessionRecorder.recordedFrames.length} frames`;
+        }
+    }
+    
+    /**
+     * Export recording to file
+     */
+    exportRecording() {
+        if (!this.sessionRecorder) return;
+        
+        if (this.sessionRecorder.recordedFrames.length === 0) {
+            this.showNotification('No recording data to export', 'warning');
+            return;
+        }
+        
+        this.sessionRecorder.downloadRecording();
+        this.showNotification('Recording exported successfully', 'success');
+    }
+    
+    /**
+     * Record prediction frame if recording is active
+     */
+    recordPredictionFrame(prediction, landmarks = null) {
+        if (!this.sessionRecorder || !this.sessionRecorder.isRecording) return;
+        
+        const perfMetrics = this.performanceMetrics ? this.performanceMetrics.getMetrics() : null;
+        this.sessionRecorder.recordPrediction(prediction, landmarks, perfMetrics);
+    }
+    
     // ================== CLEANUP ==================
     
     destroy() {
@@ -1562,6 +2808,10 @@ class PSLRecognitionApp {
         
         if (this.ui) {
             this.ui.destroy();
+        }
+        
+        if (this.analyticsPanel) {
+            this.analyticsPanel.destroy();
         }
         
         console.log('[OK] App destroyed');

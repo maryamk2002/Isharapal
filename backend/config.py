@@ -186,6 +186,22 @@ class LoggingConfig:
         assert self.BACKUP_COUNT >= 0, "BACKUP_COUNT must be non-negative"
 
 
+def _generate_secret_key() -> str:
+    """Generate or retrieve secret key securely."""
+    import secrets
+    env_key = os.environ.get("SECRET_KEY")
+    if env_key:
+        return env_key
+    # Generate a secure random key for development
+    # In production, always set SECRET_KEY environment variable
+    import logging
+    logging.warning(
+        "SECRET_KEY not set in environment! Using auto-generated key. "
+        "Set SECRET_KEY environment variable for production."
+    )
+    return secrets.token_hex(32)
+
+
 @dataclass
 class FlaskConfig:
     """Flask server configuration with security best practices."""
@@ -193,10 +209,7 @@ class FlaskConfig:
     HOST: str = "0.0.0.0"
     PORT: int = 5000
     DEBUG: bool = False
-    SECRET_KEY: str = field(default_factory=lambda: os.environ.get(
-        "SECRET_KEY",
-        "CHANGE_THIS_IN_PRODUCTION_psl-recognition-secret-key-2024"
-    ))
+    SECRET_KEY: str = field(default_factory=_generate_secret_key)
     
     # CORS configuration
     CORS_ORIGINS: List[str] = field(default_factory=lambda: ["*"])  # Restrict in production!
@@ -264,7 +277,12 @@ class EnvironmentConfig:
                 "MIN_DETECTION_CONFIDENCE": 0.5,
                 "MIN_TRACKING_CONFIDENCE": 0.5,
                 "ENABLE_PROFILING": False,
-                "CORS_ORIGINS": ["https://yourdomain.com"],  # Restrict in production!
+                # IMPORTANT: Set CORS_ORIGINS via environment variable in production!
+                # Example: CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+                "CORS_ORIGINS": os.environ.get(
+                    "CORS_ORIGINS", 
+                    "https://yourdomain.com"
+                ).split(","),
             },
             "testing": {
                 "DEBUG": True,
@@ -387,6 +405,24 @@ dataset_config = DatasetConfig()
 logging_config = LoggingConfig()
 flask_config = FlaskConfig()
 
+def get_frontend_config() -> Dict[str, Any]:
+    """
+    Get configuration values that should be synced with the frontend.
+    
+    Returns:
+        Dictionary containing configuration values for frontend synchronization
+    """
+    return {
+        "MODEL_SEQUENCE_LENGTH": inference_config.MODEL_SEQUENCE_LENGTH,
+        "TARGET_FPS": inference_config.TARGET_FPS,
+        "PREDICTION_HISTORY_SIZE": inference_config.PREDICTION_HISTORY_SIZE,
+        "STABILITY_THRESHOLD": inference_config.STABILITY_THRESHOLD,
+        "MIN_CONFIDENCE_THRESHOLD": inference_config.MIN_CONFIDENCE_THRESHOLD,
+        "FRAME_INTERVAL_MS": inference_config.FRAME_INTERVAL_MS,
+        "MIN_FRAMES_FOR_PREDICTION": inference_config.MIN_FRAMES_FOR_PREDICTION,
+    }
+
+
 # Export main configurations and utilities
 __all__ = [
     # Path constants
@@ -424,5 +460,6 @@ __all__ = [
     "get_config_path", 
     "get_label_map_path",
     "validate_file_extension",
+    "get_frontend_config",
 ]
 

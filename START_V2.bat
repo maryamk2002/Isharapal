@@ -12,14 +12,58 @@ echo.
 
 cd /d "%~dp0backend"
 
-set PYTHON=C:\Users\user\AppData\Local\Programs\Python\Python311\python.exe
+REM Auto-detect Python installation
+REM First try 'python' in PATH, then 'py' launcher, then common locations
+set PYTHON=
 
-if not exist "%PYTHON%" (
-    echo ERROR: Python not found at %PYTHON%
-    echo Please update the PYTHON path in this script.
-    pause
-    exit /b 1
+REM Check if python is in PATH
+where python >nul 2>&1
+if %errorlevel%==0 (
+    set PYTHON=python
+    goto :found_python
 )
+
+REM Check if py launcher is available
+where py >nul 2>&1
+if %errorlevel%==0 (
+    set PYTHON=py -3
+    goto :found_python
+)
+
+REM Check common Python installation paths
+if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+    goto :found_python
+)
+if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto :found_python
+)
+if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" (
+    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+    goto :found_python
+)
+if exist "C:\Python312\python.exe" (
+    set "PYTHON=C:\Python312\python.exe"
+    goto :found_python
+)
+if exist "C:\Python311\python.exe" (
+    set "PYTHON=C:\Python311\python.exe"
+    goto :found_python
+)
+
+REM Python not found
+echo ERROR: Python not found!
+echo.
+echo Please install Python 3.10 or higher from:
+echo   https://www.python.org/downloads/
+echo.
+echo Make sure to check "Add Python to PATH" during installation.
+pause
+exit /b 1
+
+:found_python
+echo Found Python: %PYTHON%
 
 echo Python: %PYTHON%
 echo.

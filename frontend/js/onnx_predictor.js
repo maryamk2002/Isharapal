@@ -36,9 +36,12 @@ class ONNXPredictor {
             stabilityVotes: options.stabilityVotes || 3,  // Was 5, now 3
             stabilityThreshold: options.stabilityThreshold || 2,  // Was 3, now 2
             
-            // ACCURACY: Slightly higher thresholds to reduce false positives
-            minConfidence: options.minConfidence || 0.58,  // Was 0.55, now 0.58
-            lowConfidenceThreshold: options.lowConfidenceThreshold || 0.42,  // Was 0.45, now 0.42
+            // ACCURACY: Clear confidence zones to eliminate ambiguity
+            // FIXED: Removed "gray zone" between low and min confidence
+            // Zone 1: < 0.50 = Low confidence (rejected, show "Searching...")
+            // Zone 2: >= 0.50 = Acceptable (add to stability voting)
+            minConfidence: options.minConfidence || 0.50,  // FIXED: Lowered to match lowConfidenceThreshold
+            lowConfidenceThreshold: options.lowConfidenceThreshold || 0.50,  // FIXED: Same as minConfidence (no gray zone)
             
             // ROBUSTNESS: More responsive EMA
             emaAlpha: options.emaAlpha || 0.75,  // Was 0.7, now 0.75 (more responsive)
@@ -87,15 +90,23 @@ class ONNXPredictor {
     
     /**
      * Initialize the predictor by loading model and labels.
+     * Includes automatic retry logic for network failures.
+     * 
      * @param {string} modelPath - Path to ONNX model file
      * @param {string} labelsPath - Path to labels JSON file
      * @param {string} thresholdsPath - Path to sign thresholds JSON file
+     * @param {number} retryCount - Current retry attempt (internal use)
      */
     async init(modelPath = 'models/psl_model_v2.onnx', 
                labelsPath = 'models/psl_labels.json',
-               thresholdsPath = 'models/sign_thresholds.json') {
+               thresholdsPath = 'models/sign_thresholds.json',
+               retryCount = 0) {
+        
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 2000;
+        
         try {
-            console.log('[ONNXPredictor] Initializing...');
+            console.log(`[ONNXPredictor] Initializing${retryCount > 0 ? ` (attempt ${retryCount + 1}/${MAX_RETRIES + 1})` : ''}...`);
             this._emitProgress('Loading model files...', 0);
             
             // Check if ONNX Runtime is available
@@ -105,7 +116,7 @@ class ONNXPredictor {
             
             // Load labels first (small file)
             this._emitProgress('Loading labels...', 10);
-            const labelsResponse = await fetch(labelsPath);
+            const labelsResponse = await this._fetchWithTimeout(labelsPath, 10000);
             if (!labelsResponse.ok) {
                 throw new Error(`Failed to load labels: ${labelsResponse.statusText}`);
             }
@@ -118,7 +129,7 @@ class ONNXPredictor {
             // Load sign thresholds
             this._emitProgress('Loading thresholds...', 20);
             try {
-                const thresholdsResponse = await fetch(thresholdsPath);
+                const thresholdsResponse = await this._fetchWithTimeout(thresholdsPath, 10000);
                 if (thresholdsResponse.ok) {
                     this.signThresholds = await thresholdsResponse.json();
                     console.log(`[ONNXPredictor] Loaded ${Object.keys(this.signThresholds).length} sign thresholds`);
@@ -133,9 +144,13 @@ class ONNXPredictor {
             
             // ==========================================
             // OPTIMIZED: Try WebGPU first, fallback to WASM
+            // Safari Note: WebGPU support in Safari 17+ only
             // ==========================================
             let executionProviders = ['wasm'];
             let backendUsed = 'wasm';
+            
+            // Detect Safari
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
             
             // Check for WebGPU support (significantly faster)
             if (typeof navigator !== 'undefined' && navigator.gpu) {
@@ -149,7 +164,12 @@ class ONNXPredictor {
                     }
                 } catch (e) {
                     console.log('[ONNXPredictor] WebGPU check failed, using WASM:', e.message);
+                    if (isSafari) {
+                        console.info('[ONNXPredictor] Safari detected. WebGPU requires Safari 17+. Using WASM fallback.');
+                    }
                 }
+            } else if (isSafari) {
+                console.info('[ONNXPredictor] Safari without WebGPU detected. Using WASM backend.');
             }
             
             // Configure ONNX Runtime with optimizations
@@ -180,7 +200,8 @@ class ONNXPredictor {
                 this.onReady({
                     labels: this.labels,
                     numClasses: this.labels.length,
-                    modelInfo: this.modelInfo
+                    modelInfo: this.modelInfo,
+                    isSafari: isSafari
                 });
             }
             
@@ -188,12 +209,52 @@ class ONNXPredictor {
             return true;
             
         } catch (error) {
-            console.error('[ONNXPredictor] Initialization failed:', error);
+            console.error(`[ONNXPredictor] Initialization failed:`, error);
+            
+            // Retry logic for network errors
+            if (retryCount < MAX_RETRIES && this._isRetryableError(error)) {
+                console.log(`[ONNXPredictor] Retrying in ${RETRY_DELAY_MS}ms...`);
+                this._emitProgress(`Network error. Retrying (${retryCount + 1}/${MAX_RETRIES})...`, 0);
+                
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                return this.init(modelPath, labelsPath, thresholdsPath, retryCount + 1);
+            }
+            
             if (this.onError) {
                 this.onError(error);
             }
             return false;
         }
+    }
+    
+    /**
+     * Fetch with timeout for network requests
+     * @private
+     */
+    async _fetchWithTimeout(url, timeoutMs = 30000) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+        
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            return response;
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+    
+    /**
+     * Check if error is retryable (network errors)
+     * @private
+     */
+    _isRetryableError(error) {
+        const message = error.message?.toLowerCase() || '';
+        return message.includes('network') ||
+               message.includes('fetch') ||
+               message.includes('timeout') ||
+               message.includes('abort') ||
+               message.includes('failed to fetch') ||
+               error.name === 'AbortError';
     }
     
     /**
@@ -461,7 +522,8 @@ class ONNXPredictor {
                 this.onPrediction({
                     label: stablePrediction[0],
                     confidence: stablePrediction[1],
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    allPredictions: allPredictions  // FIXED: Include all predictions for disambiguation
                 });
             }
             

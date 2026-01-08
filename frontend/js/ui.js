@@ -4,6 +4,11 @@
  */
 
 class UIManager {
+    // Configuration constants - sync with backend config.py
+    static MODEL_SEQUENCE_LENGTH = 60;
+    static CRITICAL_ELEMENTS = ['statusDot', 'statusText', 'startBtn', 'stopBtn', 'predictionResult', 'confidenceFill', 'confidenceText'];
+    static OPTIONAL_ELEMENTS = ['bufferFill', 'bufferCount', 'bufferStatusText', 'historyList', 'clearHistoryBtn', 'feedbackSection', 'feedbackCorrect', 'feedbackIncorrect', 'notificationContainer'];
+    
     constructor() {
         this._currentLanguage = 'urdu';
         this.isRecognitionActive = false;
@@ -11,6 +16,7 @@ class UIManager {
         
         // UI elements
         this.elements = {};
+        this.missingElements = [];
         
         // Notification system
         this.notifications = [];
@@ -30,7 +36,7 @@ class UIManager {
             // Set up initial state
             this.setConnectionStatus(false);
             this.setRecognitionState(false);
-            this.updateBuffer(0, 45);
+            this.updateBuffer(0, UIManager.MODEL_SEQUENCE_LENGTH);
             this.updateHandStatus(false);
             this.updateFPS(0);
             
@@ -55,10 +61,10 @@ class UIManager {
             stopBtn: document.getElementById('stopBtn'),
             resetBtn: document.getElementById('resetBtn'),
             
-            // Prediction display
-            predictionDisplay: document.getElementById('predictionDisplay'),
+            // Prediction display - Try both IDs for compatibility
+            predictionResult: document.getElementById('predictionResult') || document.getElementById('predictionDisplay'),
             confidenceFill: document.getElementById('confidenceFill'),
-            confidenceValue: document.getElementById('confidenceValue'),
+            confidenceText: document.getElementById('confidenceText'),
             
             // Buffer elements
             bufferFill: document.getElementById('bufferFill'),
@@ -80,9 +86,31 @@ class UIManager {
             feedbackCorrect: document.getElementById('feedbackCorrect'),
             feedbackIncorrect: document.getElementById('feedbackIncorrect'),
             
-            // Notifications
-            notificationContainer: document.getElementById('notificationContainer')
+            // Notifications - Try both IDs for compatibility
+            notificationContainer: document.getElementById('notificationContainer') || document.getElementById('notifications')
         };
+        
+        // Validate critical elements and log warnings for missing ones
+        this.missingElements = [];
+        UIManager.CRITICAL_ELEMENTS.forEach(elementName => {
+            if (!this.elements[elementName]) {
+                this.missingElements.push(elementName);
+                console.warn(`[UIManager] Critical element missing: ${elementName}`);
+            }
+        });
+        
+        // Log optional missing elements at debug level
+        UIManager.OPTIONAL_ELEMENTS.forEach(elementName => {
+            if (!this.elements[elementName]) {
+                console.debug(`[UIManager] Optional element not found: ${elementName}`);
+            }
+        });
+        
+        if (this.missingElements.length > 0) {
+            console.warn(`[UIManager] ${this.missingElements.length} critical elements missing - some UI features may not work`);
+        } else {
+            console.log('[UIManager] All critical elements cached successfully');
+        }
         
         // Track stats
         this.stats = {
@@ -118,20 +146,24 @@ class UIManager {
     setRecognitionState(active) {
         this.isRecognitionActive = active;
         
-        if (this.elements.startBtn) {
-            this.elements.startBtn.disabled = active || !this.isConnected;
+        try {
+            if (this.elements.startBtn) {
+                this.elements.startBtn.disabled = active || !this.isConnected;
+            }
+            
+            if (this.elements.stopBtn) {
+                this.elements.stopBtn.disabled = !active;
+            }
+            
+            if (this.elements.resetBtn) {
+                this.elements.resetBtn.disabled = active;
+            }
+            
+            // Update button text
+            this.updateButtonText();
+        } catch (error) {
+            console.error('[UIManager] Error in setRecognitionState:', error);
         }
-        
-        if (this.elements.stopBtn) {
-            this.elements.stopBtn.disabled = !active;
-        }
-        
-        if (this.elements.resetBtn) {
-            this.elements.resetBtn.disabled = active;
-        }
-        
-        // Update button text
-        this.updateButtonText();
     }
     
     updateButtonStates() {
@@ -173,210 +205,275 @@ class UIManager {
     }
     
     updatePrediction(prediction, confidence, allPredictions, isStable = false, isLowConfidence = false) {
-        // Update prediction display with new structure
-        if (this.elements.predictionDisplay) {
-            if (isLowConfidence) {
-                // Show "Searching..." state for low confidence predictions
-                this.elements.predictionDisplay.innerHTML = `
-                    <div class="prediction-placeholder searching">
-                        <div class="placeholder-icon">🔍</div>
-                        <div class="placeholder-text">
+        try {
+            // Update prediction display with new structure
+            if (this.elements.predictionResult) {
+                if (isLowConfidence) {
+                    // Show "Searching..." state for low confidence predictions
+                    this.elements.predictionResult.innerHTML = `
+                        <span class="placeholder searching">
                             <span class="urdu">تلاش جاری ہے...</span>
                             <span class="english">Searching...</span>
-                        </div>
-                    </div>
-                `;
-            } else if (prediction) {
-                this.elements.predictionDisplay.innerHTML = `
-                    <div class="sign-result">
-                        <div class="sign-text">${prediction}</div>
-                    </div>
-                `;
+                        </span>
+                    `;
+                } else if (prediction) {
+                    this.elements.predictionResult.innerHTML = `
+                        <span class="prediction">${prediction}</span>
+                    `;
+                    
+                    // Add flash effect for new predictions (wrapped in try-catch for classList safety)
+                    try {
+                        this.elements.predictionResult.classList.add('flash');
+                        setTimeout(() => {
+                            try {
+                                if (this.elements.predictionResult) {
+                                    this.elements.predictionResult.classList.remove('flash');
+                                }
+                            } catch (e) {
+                                // Element may have been removed during timeout
+                            }
+                        }, 300);
+                    } catch (e) {
+                        console.debug('[UIManager] Flash effect failed:', e);
+                    }
+                    
+                    // Increment sign count
+                    this.stats.signCount++;
+                    if (this.elements.signCountValue) {
+                        this.elements.signCountValue.textContent = this.stats.signCount;
+                    }
+                    
+                    // Add to history
+                    this.addToHistory(prediction, confidence);
+                    
+                } else {
+                    this.elements.predictionResult.innerHTML = `
+                        <span class="placeholder">
+                            <span class="urdu">اشارہ دکھائیں</span>
+                            <span class="english">Make a sign</span>
+                        </span>
+                    `;
+                }
+            }
+            
+            // Update confidence bar and value
+            if (confidence !== undefined) {
+                const confidencePercent = Math.round(confidence * 100);
                 
-                // Increment sign count
-                this.stats.signCount++;
-                if (this.elements.signCountValue) {
-                    this.elements.signCountValue.textContent = this.stats.signCount;
+                if (this.elements.confidenceFill) {
+                    this.elements.confidenceFill.style.width = `${confidencePercent}%`;
                 }
                 
-                // Add to history
-                this.addToHistory(prediction, confidence);
-                
+                if (this.elements.confidenceText) {
+                    this.elements.confidenceText.textContent = `${confidencePercent}%`;
+                }
             } else {
-                this.elements.predictionDisplay.innerHTML = `
-                    <div class="prediction-placeholder">
-                        <div class="placeholder-icon">👋</div>
-                        <div class="placeholder-text">
-                        <span class="urdu">اشارہ دکھائیں</span>
-                            <span class="english">Show a sign to begin</span>
-                        </div>
-                    </div>
-                `;
+                if (this.elements.confidenceFill) {
+                    this.elements.confidenceFill.style.width = '0%';
+                }
+                if (this.elements.confidenceText) {
+                    this.elements.confidenceText.textContent = '0%';
+                }
             }
-        }
-        
-        // Update confidence bar and value
-        if (confidence !== undefined) {
-            const confidencePercent = Math.round(confidence * 100);
-            
-            if (this.elements.confidenceFill) {
-                this.elements.confidenceFill.style.width = `${confidencePercent}%`;
-            }
-            
-            if (this.elements.confidenceValue) {
-                this.elements.confidenceValue.textContent = `${confidencePercent}%`;
-            }
-        } else {
-            if (this.elements.confidenceFill) {
-                this.elements.confidenceFill.style.width = '0%';
-            }
-            if (this.elements.confidenceValue) {
-                this.elements.confidenceValue.textContent = '0%';
-            }
+        } catch (error) {
+            console.error('[UIManager] Error in updatePrediction:', error);
         }
     }
     
     clearPrediction() {
-        // Clear prediction display to placeholder state
-        if (this.elements.predictionDisplay) {
-            this.elements.predictionDisplay.innerHTML = `
-                <div class="prediction-placeholder">
-                    <div class="placeholder-icon">👋</div>
-                    <div class="placeholder-text">
+        try {
+            // Clear prediction display to placeholder state
+            if (this.elements.predictionResult) {
+                this.elements.predictionResult.innerHTML = `
+                    <span class="placeholder">
                         <span class="urdu">اشارہ دکھائیں</span>
-                        <span class="english">Show a sign to begin</span>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Reset confidence bar
-        if (this.elements.confidenceFill) {
-            this.elements.confidenceFill.style.width = '0%';
-        }
-        if (this.elements.confidenceValue) {
-            this.elements.confidenceValue.textContent = '0%';
+                        <span class="english">Make a sign</span>
+                    </span>
+                `;
+            }
+            
+            // Reset confidence bar
+            if (this.elements.confidenceFill) {
+                this.elements.confidenceFill.style.width = '0%';
+            }
+            if (this.elements.confidenceText) {
+                this.elements.confidenceText.textContent = '0%';
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in clearPrediction:', error);
         }
     }
     
     updateBuffer(current, total) {
-        // Update buffer progress bar
-        const percent = Math.min(100, (current / total) * 100);
-        
-        if (this.elements.bufferFill) {
-            this.elements.bufferFill.style.width = `${percent}%`;
-        }
-        
-        if (this.elements.bufferCount) {
-            this.elements.bufferCount.textContent = `${current}/${total}`;
-        }
-        
-        if (this.elements.bufferStatusText) {
-            if (current === 0) {
-                this.elements.bufferStatusText.innerHTML = '<span id="bufferCount">0/45</span> frames';
-            } else {
-                this.elements.bufferStatusText.innerHTML = `<span id="bufferCount">${current}/${total}</span> frames`;
+        try {
+            // Use constant if total not provided
+            const targetTotal = total || UIManager.MODEL_SEQUENCE_LENGTH;
+            
+            // Update buffer progress bar
+            const percent = Math.min(100, (current / targetTotal) * 100);
+            
+            if (this.elements.bufferFill) {
+                this.elements.bufferFill.style.width = `${percent}%`;
             }
-        }
-        
-        // Update system status
-        if (this.elements.systemStatusValue) {
-            if (current >= total) {
-                this.elements.systemStatusValue.textContent = 'Processing';
-                this.elements.systemStatusValue.style.color = '#3b82f6';
-            } else if (current > 0) {
-                this.elements.systemStatusValue.textContent = 'Collecting';
-                this.elements.systemStatusValue.style.color = '#f59e0b';
+            
+            if (this.elements.bufferCount) {
+                this.elements.bufferCount.textContent = `${current}/${targetTotal}`;
             }
+            
+            if (this.elements.bufferStatusText) {
+                if (current === 0) {
+                    this.elements.bufferStatusText.innerHTML = `<span id="bufferCount">0/${UIManager.MODEL_SEQUENCE_LENGTH}</span> frames`;
+                } else {
+                    this.elements.bufferStatusText.innerHTML = `<span id="bufferCount">${current}/${targetTotal}</span> frames`;
+                }
+            }
+            
+            // Update system status
+            if (this.elements.systemStatusValue) {
+                if (current >= targetTotal) {
+                    this.elements.systemStatusValue.textContent = 'Processing';
+                    this.elements.systemStatusValue.style.color = '#3b82f6';
+                } else if (current > 0) {
+                    this.elements.systemStatusValue.textContent = 'Collecting';
+                    this.elements.systemStatusValue.style.color = '#f59e0b';
+                }
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in updateBuffer:', error);
         }
     }
     
     updateHandStatus(hasHands) {
-        if (this.elements.handStatus) {
-            const label = this.elements.handStatus.querySelector('.status-label');
-            if (hasHands) {
-                this.elements.handStatus.classList.add('hands-detected');
-                if (label) label.textContent = 'Hands detected';
-            } else {
-                this.elements.handStatus.classList.remove('hands-detected');
-                if (label) label.textContent = 'No hands';
+        try {
+            if (this.elements.handStatus) {
+                const label = this.elements.handStatus.querySelector('.status-label');
+                if (hasHands) {
+                    this.elements.handStatus.classList.add('hands-detected');
+                    if (label) label.textContent = 'Hands detected';
+                } else {
+                    this.elements.handStatus.classList.remove('hands-detected');
+                    if (label) label.textContent = 'No hands';
+                }
             }
+        } catch (error) {
+            console.error('[UIManager] Error in updateHandStatus:', error);
         }
     }
     
     updateFPS(fps) {
-        this.stats.fps = fps;
-        if (this.elements.fpsValue) {
-            this.elements.fpsValue.textContent = Math.round(fps);
+        try {
+            this.stats.fps = fps;
+            if (this.elements.fpsValue) {
+                this.elements.fpsValue.textContent = Math.round(fps);
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in updateFPS:', error);
         }
     }
     
     addToHistory(prediction, confidence) {
-        if (!this.elements.historyList) return;
-        
-        // Remove empty state
-        const emptyState = this.elements.historyList.querySelector('.history-empty-simple');
-        if (emptyState) {
-            emptyState.remove();
+        // Early return if historyList element is missing
+        if (!this.elements.historyList) {
+            console.debug('[UIManager] historyList element not found, skipping addToHistory');
+            return;
         }
         
-        // Show clear button
-        if (this.elements.clearHistoryBtn) {
-            this.elements.clearHistoryBtn.style.display = 'block';
-        }
-        
-        // Create history item
-        const item = document.createElement('div');
-        item.className = 'history-item';
-        
-        const timestamp = new Date().toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit'
-        });
-        
-        item.innerHTML = `
-            <div class="history-item-label">${prediction}</div>
-            <div class="history-item-meta">
-                <span class="history-item-confidence">${Math.round(confidence * 100)}%</span>
-                <span class="history-item-time">${timestamp}</span>
-            </div>
-        `;
-        
-        // Add to top of list
-        this.elements.historyList.insertBefore(item, this.elements.historyList.firstChild);
-        
-        // Limit history to 8 items for compact view
-        const items = this.elements.historyList.querySelectorAll('.history-item');
-        if (items.length > 8) {
-            items[items.length - 1].remove();
+        try {
+            // Remove empty state - check both class names for compatibility
+            const emptyState = this.elements.historyList.querySelector('.history-empty') || 
+                               this.elements.historyList.querySelector('.history-empty-simple');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            // Show clear button
+            if (this.elements.clearHistoryBtn) {
+                this.elements.clearHistoryBtn.style.display = 'block';
+            }
+            
+            // Create history item
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+            });
+            
+            item.innerHTML = `
+                <div class="history-item-label">${prediction}</div>
+                <div class="history-item-meta">
+                    <span class="history-item-confidence">${Math.round(confidence * 100)}%</span>
+                    <span class="history-item-time">${timestamp}</span>
+                </div>
+            `;
+            
+            // Add to top of list
+            this.elements.historyList.insertBefore(item, this.elements.historyList.firstChild);
+            
+            // Limit history to 8 items for compact view
+            const items = this.elements.historyList.querySelectorAll('.history-item');
+            if (items.length > 8) {
+                items[items.length - 1].remove();
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in addToHistory:', error);
         }
     }
     
     clearHistory() {
-        if (!this.elements.historyList) return;
+        // Early return if historyList element is missing
+        if (!this.elements.historyList) {
+            console.debug('[UIManager] historyList element not found, skipping clearHistory');
+            return;
+        }
         
-        this.elements.historyList.innerHTML = `
-            <div class="history-empty-simple">
-                <span class="english">No signs yet</span>
-            </div>
-        `;
-        
-        // Hide clear button
-        if (this.elements.clearHistoryBtn) {
-            this.elements.clearHistoryBtn.style.display = 'none';
+        try {
+            this.elements.historyList.innerHTML = `
+                <div class="history-empty">
+                    <span class="english">No signs yet</span>
+                </div>
+            `;
+            
+            // Hide clear button
+            if (this.elements.clearHistoryBtn) {
+                this.elements.clearHistoryBtn.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in clearHistory:', error);
         }
     }
     
     showStabilizing(historySize, threshold) {
-        // Show that we're gathering predictions for stability
-        if (this.elements.predictionResult) {
-            const progress = Math.min(100, (historySize / threshold) * 100);
-            this.elements.predictionResult.innerHTML = `
-                <span class="placeholder stabilizing">
-                    <span class="urdu">استحکام کر رہے ہیں... ${Math.round(progress)}%</span>
-                    <span class="english">Stabilizing... ${Math.round(progress)}%</span>
-                </span>
-            `;
+        try {
+            // Show that we're gathering predictions for stability
+            if (this.elements.predictionResult) {
+                const progress = Math.min(100, (historySize / threshold) * 100);
+                this.elements.predictionResult.innerHTML = `
+                    <span class="placeholder stabilizing">
+                        <span class="urdu">استحکام کر رہے ہیں... ${Math.round(progress)}%</span>
+                        <span class="english">Stabilizing... ${Math.round(progress)}%</span>
+                    </span>
+                `;
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in showStabilizing:', error);
+        }
+    }
+    
+    showTemporaryPrediction(prediction, confidence) {
+        try {
+            // Show a muted/temporary prediction while stabilizing
+            if (this.elements.predictionResult && prediction) {
+                this.elements.predictionResult.innerHTML = `
+                    <span class="placeholder stabilizing">
+                        <span class="prediction-temp">${prediction}</span>
+                        <span class="english" style="opacity: 0.7; font-size: 0.8em;">Confirming...</span>
+                    </span>
+                `;
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in showTemporaryPrediction:', error);
         }
     }
     
@@ -386,28 +483,44 @@ class UIManager {
     }
     
     showLoadingProgress(percent) {
-        // Show a subtle loading indicator during initial frame collection
-        if (this.elements.predictionResult) {
-            const placeholder = this.elements.predictionResult.querySelector('.placeholder');
-            if (placeholder && percent < 100) {
-                placeholder.innerHTML = `
-                    <span class="urdu">فریم جمع کر رہے ہیں... ${percent}%</span>
-                    <span class="english">Collecting frames... ${percent}%</span>
-                `;
+        try {
+            // Show a subtle loading indicator during initial frame collection
+            if (this.elements.predictionResult) {
+                const placeholder = this.elements.predictionResult.querySelector('.placeholder');
+                if (placeholder && percent < 100) {
+                    placeholder.innerHTML = `
+                        <span class="urdu">فریم جمع کر رہے ہیں... ${percent}%</span>
+                        <span class="english">Collecting frames... ${percent}%</span>
+                    `;
+                } else if (percent < 100) {
+                    // No placeholder exists, create the loading state
+                    this.elements.predictionResult.innerHTML = `
+                        <span class="placeholder">
+                            <span class="urdu">فریم جمع کر رہے ہیں... ${percent}%</span>
+                            <span class="english">Collecting frames... ${percent}%</span>
+                        </span>
+                    `;
+                }
             }
+        } catch (error) {
+            console.error('[UIManager] Error in showLoadingProgress:', error);
         }
     }
     
     hideLoadingProgress() {
-        // Hide loading indicator
-        if (this.elements.predictionResult) {
-            const placeholder = this.elements.predictionResult.querySelector('.placeholder');
-            if (placeholder) {
-                placeholder.innerHTML = `
-                    <span class="urdu">اشارہ دکھائیں</span>
-                    <span class="english">Make a sign</span>
-                `;
+        try {
+            // Hide loading indicator - only if showing loading state
+            if (this.elements.predictionResult) {
+                const placeholder = this.elements.predictionResult.querySelector('.placeholder');
+                if (placeholder && placeholder.textContent && placeholder.textContent.includes('Collecting')) {
+                    placeholder.innerHTML = `
+                        <span class="urdu">اشارہ دکھائیں</span>
+                        <span class="english">Make a sign</span>
+                    `;
+                }
             }
+        } catch (error) {
+            console.error('[UIManager] Error in hideLoadingProgress:', error);
         }
     }
     
@@ -459,31 +572,46 @@ class UIManager {
     
     showNotification(message, type = 'info', duration = 5000) {
         const container = this.elements.notificationContainer;
-        if (!container) return;
+        if (!container) {
+            console.debug('[UIManager] Notification container not found, logging instead:', type, message);
+            return;
+        }
         
-        const notification = this.createNotification(message, type);
-        container.appendChild(notification);
-            
+        try {
+            const notification = this.createNotification(message, type);
+            container.appendChild(notification);
+                
             // Remove old notifications
-        while (container.children.length > this.maxNotifications) {
-            container.removeChild(container.firstChild);
+            while (container.children.length > this.maxNotifications) {
+                container.removeChild(container.firstChild);
             }
-            
+                
             // Auto-remove notification
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.style.opacity = '0';
-                notification.style.transform = 'translateX(100%)';
             setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
+                try {
+                    if (notification.parentNode) {
+                        notification.style.opacity = '0';
+                        notification.style.transform = 'translateX(100%)';
+                        setTimeout(() => {
+                            try {
+                                if (notification.parentNode) {
+                                    notification.parentNode.removeChild(notification);
+                                }
+                            } catch (e) {
+                                // Element may have been removed already
+                            }
+                        }, 300);
                     }
-                }, 300);
+                } catch (e) {
+                    // Element may have been removed already
                 }
             }, duration);
-        
-        // Store notification reference
-        this.notifications.push(notification);
+            
+            // Store notification reference
+            this.notifications.push(notification);
+        } catch (error) {
+            console.error('[UIManager] Error in showNotification:', error);
+        }
     }
     
     createNotification(message, type) {
@@ -527,60 +655,72 @@ class UIManager {
     }
     
     reset() {
-        console.log('Resetting UI...');
+        console.log('[UIManager] Resetting UI...');
         
-        // Reset prediction display
-        this.updatePrediction(null, 0, []);
-        
-        // Reset buffer
-        this.updateBuffer(0, 45);
-        
-        // Reset hand status
-        this.updateHandStatus(false);
-        
-        // Clear history
-        this.clearHistory();
-        
-        // Reset stats
-        this.stats.signCount = 0;
-        if (this.elements.signCountValue) {
-            this.elements.signCountValue.textContent = '0';
+        try {
+            // Reset prediction display
+            this.updatePrediction(null, 0, []);
+            
+            // Reset buffer using constant
+            this.updateBuffer(0, UIManager.MODEL_SEQUENCE_LENGTH);
+            
+            // Reset hand status
+            this.updateHandStatus(false);
+            
+            // Clear history
+            this.clearHistory();
+            
+            // Reset stats
+            this.stats.signCount = 0;
+            if (this.elements.signCountValue) {
+                this.elements.signCountValue.textContent = '0';
+            }
+            
+            // Reset system status
+            if (this.elements.systemStatusValue) {
+                this.elements.systemStatusValue.textContent = 'Ready';
+                this.elements.systemStatusValue.style.color = '#10b981';
+            }
+            
+            // Clear notifications
+            this.clearNotifications();
+            
+            // Reset button states
+            this.setRecognitionState(false);
+            
+            console.log('[UIManager] UI reset complete');
+        } catch (error) {
+            console.error('[UIManager] Error in reset:', error);
         }
-        
-        // Reset system status
-        if (this.elements.systemStatusValue) {
-            this.elements.systemStatusValue.textContent = 'Ready';
-            this.elements.systemStatusValue.style.color = '#10b981';
-        }
-        
-        // Clear notifications
-        this.clearNotifications();
-        
-        // Reset button states
-        this.setRecognitionState(false);
-        
-        console.log('UI reset complete');
     }
     
     // Utility methods
     showLoading(message = 'Loading...') {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            const loadingText = overlay.querySelector('.loading-text');
-            if (loadingText) {
-                loadingText.innerHTML = `
-                    <span class="urdu">${message}</span>
-                    <span class="english">${message}</span>
-                `;
+        try {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                const loadingText = overlay.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.innerHTML = `
+                        <span class="urdu">${message}</span>
+                        <span class="english">${message}</span>
+                    `;
+                }
+                overlay.classList.remove('hidden');
             }
-            overlay.classList.remove('hidden');
+        } catch (error) {
+            console.error('[UIManager] Error in showLoading:', error);
         }
     }
     
     hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.classList.add('hidden');
+        try {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error('[UIManager] Error in hideLoading:', error);
         }
     }
     

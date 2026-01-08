@@ -10,7 +10,7 @@ class CameraManager {
         this.ctx = null;
         this.stream = null;
         this.isActive = false;
-        this.frameRate = 18;  // OPTIMIZED: Increased from 15 to 18 FPS for faster response
+        this.frameRate = 15;  // Match backend TARGET_FPS config (15 FPS)
         this.frameInterval = null;
         this.lastFrameTime = 0;
         this.frameCanvas = null;
@@ -43,6 +43,19 @@ class CameraManager {
         this.watchdogInterval = null;
         this.mediaPipeFreezeThreshold = 5000; // 5 seconds without response = frozen
         
+        // MediaPipe recovery tracking
+        this.recoveryAttempts = 0;
+        this.maxRecoveryAttempts = 3;
+        this.isRecovering = false;
+        this.consecutiveErrors = 0;
+        this.maxConsecutiveErrors = 5;
+        
+        // Instance identification for global state management
+        this.instanceId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        
+        // Track tab visibility state for restoration
+        this.wasActiveBeforeHidden = false;
+        
         // Clear global MediaPipe on page unload to prevent memory issues
         window.addEventListener('beforeunload', () => {
             if (window.globalMediaPipeHands) {
@@ -58,17 +71,22 @@ class CameraManager {
         // Handle tab visibility changes to prevent MediaPipe freezes
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                console.log('Tab hidden - pausing frame capture');
+                console.log('[Camera] Tab hidden - pausing frame capture');
+                // Track if we were active before hiding
+                this.wasActiveBeforeHidden = this.isActive;
                 // Don't stop completely, just slow down
                 this.noHandsThrottleMs = 1000; // Slow emissions when hidden
             } else {
-                console.log('Tab visible - resuming frame capture');
+                console.log('[Camera] Tab visible - resuming frame capture');
                 this.noHandsThrottleMs = 200; // Normal rate
                 this.lastMediaPipeResponse = Date.now(); // Reset watchdog
+                this.recoveryAttempts = 0; // Reset recovery counter
+                this.consecutiveErrors = 0; // Reset error counter
                 
-                // Force a keep-alive emission after becoming visible
+                // Add short delay before resuming to let MediaPipe stabilize
                 setTimeout(() => {
-                    if (this.isActive) {
+                    if (this.wasActiveBeforeHidden && this.isActive) {
+                        // Force a keep-alive emission after becoming visible
                         this.emit('landmarks', {
                             landmarks: null,
                             hasHands: false,
@@ -76,7 +94,7 @@ class CameraManager {
                             isVisibilityResume: true
                         });
                     }
-                }, 100);
+                }, 200); // Slightly longer delay for stability
             }
         });
     }
@@ -146,10 +164,10 @@ class CameraManager {
             }
             
             // Check if global instance exists and is valid
-            if (window.globalMediaPipeHands) {
+            if (window.globalMediaPipeHands && window.mediaPipeInstanceId) {
                 try {
-                    // Test if the instance is still valid
-                    console.log('✓ Checking existing MediaPipe Hands instance...');
+                    // Verify the instance is still valid and not owned by a destroyed instance
+                    console.log('[Camera] Checking existing MediaPipe Hands instance...');
                     this.hands = window.globalMediaPipeHands;
                     
                     // Re-attach results handler
@@ -163,6 +181,7 @@ class CameraManager {
                     // Instance is stale, need to recreate
                     console.log('⚠️ Cached MediaPipe instance invalid, recreating...');
                     window.globalMediaPipeHands = null;
+                    window.mediaPipeInstanceId = null;
                 }
             }
             
@@ -223,6 +242,7 @@ class CameraManager {
             
             // Store globally to prevent re-initialization
             window.globalMediaPipeHands = this.hands;
+            window.mediaPipeInstanceId = this.instanceId; // Track which instance owns this
             window.mediaPipeInitializing = false;
             
             console.log('✅ MediaPipe Hands fully loaded and ready!');
@@ -276,12 +296,13 @@ class CameraManager {
             
             console.log('Starting camera...');
             
-            // Get user media
+            // Get user media - facingMode 'user' for front camera on mobile
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     width: { ideal: 640 },
                     height: { ideal: 480 },
-                    frameRate: { ideal: 30 }
+                    frameRate: { ideal: 30 },
+                    facingMode: 'user'  // Front camera for sign language
                 }
             });
             
@@ -327,9 +348,83 @@ class CameraManager {
             
         } catch (error) {
             console.error('Failed to start camera:', error);
-            this.emit('error', error);
+            
+            // FIXED: Provide specific error information for better UX
+            const errorInfo = this._classifyCameraError(error);
+            this.emit('error', {
+                ...errorInfo,
+                originalError: error
+            });
             return false;
         }
+    }
+    
+    /**
+     * FIXED: Classify camera errors for better user feedback
+     * @param {Error} error - The original error
+     * @returns {Object} Classified error with type and user-friendly message
+     */
+    _classifyCameraError(error) {
+        const errorName = error.name || '';
+        const errorMessage = error.message || '';
+        
+        // Permission denied
+        if (errorName === 'NotAllowedError' || errorMessage.includes('Permission denied')) {
+            return {
+                type: 'permission_denied',
+                message: 'Camera access was denied. Please allow camera permissions.',
+                userAction: 'Click the camera icon in your browser\'s address bar and allow access.',
+                canRetry: true
+            };
+        }
+        
+        // No camera found
+        if (errorName === 'NotFoundError' || errorMessage.includes('Requested device not found')) {
+            return {
+                type: 'no_camera',
+                message: 'No camera found on this device.',
+                userAction: 'Please connect a camera and try again.',
+                canRetry: true
+            };
+        }
+        
+        // Camera in use by another app
+        if (errorName === 'NotReadableError' || errorMessage.includes('Could not start video source')) {
+            return {
+                type: 'camera_in_use',
+                message: 'Camera is being used by another application.',
+                userAction: 'Close other apps using the camera (video calls, etc.) and try again.',
+                canRetry: true
+            };
+        }
+        
+        // Overconstrained (requested resolution not available)
+        if (errorName === 'OverconstrainedError') {
+            return {
+                type: 'overconstrained',
+                message: 'Camera does not support the requested settings.',
+                userAction: 'Try refreshing the page.',
+                canRetry: true
+            };
+        }
+        
+        // HTTPS required
+        if (errorName === 'SecurityError' || errorMessage.includes('secure context')) {
+            return {
+                type: 'security',
+                message: 'Camera access requires a secure connection (HTTPS).',
+                userAction: 'Please access this site using HTTPS.',
+                canRetry: false
+            };
+        }
+        
+        // Generic/unknown error
+        return {
+            type: 'unknown',
+            message: `Camera error: ${errorMessage || 'Unknown error'}`,
+            userAction: 'Please refresh the page and try again.',
+            canRetry: true
+        };
     }
     
     stop() {
@@ -409,6 +504,15 @@ class CameraManager {
             
             if (timeSinceLastResponse > this.mediaPipeFreezeThreshold) {
                 console.warn(`⚠️ MediaPipe appears frozen (${(timeSinceLastResponse / 1000).toFixed(1)}s without response). Attempting recovery...`);
+                
+                // FIXED: Emit recovery_started event so UI can show feedback to user
+                this.emit('mediapipe_recovery', {
+                    status: 'started',
+                    attempt: this.recoveryAttempts + 1,
+                    maxAttempts: this.maxRecoveryAttempts,
+                    message: 'Hand detection recovering...'
+                });
+                
                 this.attemptMediaPipeRecovery();
             }
         }, 2000); // Check every 2 seconds
@@ -422,18 +526,56 @@ class CameraManager {
     }
     
     async attemptMediaPipeRecovery() {
-        console.log('🔄 Attempting MediaPipe recovery...');
+        // Prevent concurrent recovery attempts
+        if (this.isRecovering) {
+            console.log('[Camera] Recovery already in progress, skipping');
+            return;
+        }
+        
+        this.isRecovering = true;
+        this.recoveryAttempts++;
+        
+        console.log(`🔄 Attempting MediaPipe recovery (attempt ${this.recoveryAttempts}/${this.maxRecoveryAttempts})...`);
         
         // Reset the response timer to prevent repeated recovery attempts
         this.lastMediaPipeResponse = Date.now();
         
         try {
+            // Check if we've exceeded max recovery attempts
+            if (this.recoveryAttempts > this.maxRecoveryAttempts) {
+                console.error('❌ Max recovery attempts exceeded - page reload may be required');
+                this.emit('error', { 
+                    message: 'MediaPipe recovery failed after multiple attempts. Please refresh the page.',
+                    code: 'RECOVERY_EXHAUSTED',
+                    requiresReload: true
+                });
+                this.isRecovering = false;
+                return;
+            }
+            
             // Force re-initialize MediaPipe
             if (this.hands) {
                 try {
                     this.hands.reset();
+                    console.log('[Camera] MediaPipe reset successful');
                 } catch (e) {
-                    console.warn('MediaPipe reset failed, continuing:', e);
+                    console.warn('[Camera] MediaPipe reset failed, attempting close and reinit:', e);
+                    
+                    // Try harder recovery - close and reinitialize
+                    try {
+                        if (typeof this.hands.close === 'function') {
+                            this.hands.close();
+                        }
+                        window.globalMediaPipeHands = null;
+                        window.mediaPipeInstanceId = null;
+                        
+                        // Reinitialize after a short delay
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await this.initMediaPipe();
+                        console.log('✅ MediaPipe reinitialized after close');
+                    } catch (reinitError) {
+                        console.error('[Camera] MediaPipe reinit failed:', reinitError);
+                    }
                 }
             }
             
@@ -445,11 +587,29 @@ class CameraManager {
                 isRecovery: true
             });
             
+            // FIXED: Emit recovery success event so UI can update
+            this.emit('mediapipe_recovery', {
+                status: 'success',
+                attempt: this.recoveryAttempts,
+                message: 'Hand detection recovered!'
+            });
+            
             console.log('✅ MediaPipe recovery signal sent');
             
         } catch (error) {
             console.error('❌ MediaPipe recovery failed:', error);
+            
+            // FIXED: Emit recovery failure event
+            this.emit('mediapipe_recovery', {
+                status: 'failed',
+                attempt: this.recoveryAttempts,
+                message: 'Recovery failed. Please refresh the page.',
+                error: error.message
+            });
+            
             this.emit('error', { message: 'MediaPipe recovery failed', error });
+        } finally {
+            this.isRecovering = false;
         }
     }
     
@@ -480,11 +640,27 @@ class CameraManager {
             if (this.hands) {
                 // Don't use mediaPipeBusy flag here - MediaPipe handles its own queue
                 // Just send the frame and let MediaPipe process it
-                this.hands.send({ image: this.video }).catch(err => {
+                this.hands.send({ image: this.video }).then(() => {
+                    // Success - reset error counter
+                    this.consecutiveErrors = 0;
+                }).catch(err => {
+                    // Track consecutive errors
+                    this.consecutiveErrors++;
+                    
                     // Log error but don't crash - throttle error logging
                     if (this.stats.framesCaptured % 60 === 0) {
-                        console.warn('MediaPipe send error:', err?.message || err);
+                        console.warn(`[Camera] MediaPipe send error (${this.consecutiveErrors} consecutive):`, err?.message || err);
                     }
+                    
+                    // Emit warning after multiple consecutive errors
+                    if (this.consecutiveErrors >= this.maxConsecutiveErrors) {
+                        console.warn(`[Camera] ${this.consecutiveErrors} consecutive MediaPipe errors - may need recovery`);
+                        this.emit('mediapipe_warning', { 
+                            consecutiveErrors: this.consecutiveErrors,
+                            message: 'Multiple consecutive frame processing errors'
+                        });
+                    }
+                    
                     // Emit no-hands to keep connection alive
                     this.emit('landmarks', {
                         landmarks: null,
@@ -495,7 +671,7 @@ class CameraManager {
             } else {
                 // MediaPipe not ready - log every 60 frames (~4 seconds)
                 if (this.stats.framesCaptured % 60 === 0) {
-                    console.warn('MediaPipe not ready, skipping frame', this.stats.framesCaptured);
+                    console.warn('[Camera] MediaPipe not ready, skipping frame', this.stats.framesCaptured);
                 }
                 // Still emit no-hands to keep connection alive (throttled)
                 if (this.stats.framesCaptured % 15 === 0) {

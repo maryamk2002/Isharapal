@@ -1,0 +1,343 @@
+{
+  "version": "1.0",
+  "generated": "2026-01-07T23:12:28.864724",
+  "signs": {
+    "1-Hay": {
+      "romanized": "1-Hay",
+      "urdu": "ہ",
+      "webp": "1-Hay.webp",
+      "jpg": "1-Hay.jpg",
+      "source": "s0252-10hay-Generated-616.jpg",
+      "type": "image"
+    },
+    "2-Hay": {
+      "romanized": "2-Hay",
+      "urdu": "ھ",
+      "webp": "2-Hay.webp",
+      "jpg": "2-Hay.jpg",
+      "source": "haay.mp4",
+      "type": "video_frame"
+    },
+    "Ain": {
+      "romanized": "Ain",
+      "urdu": "ع",
+      "webp": "Ain.webp",
+      "jpg": "Ain.jpg",
+      "source": "s0267-25ain-Generated-437.jpg",
+      "type": "image"
+    },
+    "Alif": {
+      "romanized": "Alif",
+      "urdu": "ا",
+      "webp": "Alif.webp",
+      "jpg": "Alif.jpg",
+      "source": "s0269-02alif-Generated-1672.jpg",
+      "type": "image"
+    },
+    "Alifmad": {
+      "romanized": "Alifmad",
+      "urdu": "آ",
+      "webp": "Alifmad.webp",
+      "jpg": "Alifmad.jpg",
+      "source": "alif_madda.mp4",
+      "type": "video_frame"
+    },
+    "Aray": {
+      "romanized": "Aray",
+      "urdu": "ڑ",
+      "webp": "Aray.webp",
+      "jpg": "Aray.jpg",
+      "source": "rray.mp4",
+      "type": "video_frame"
+    },
+    "Bariyay": {
+      "romanized": "Bariyay",
+      "urdu": "ے",
+      "webp": "Bariyay.webp",
+      "jpg": "Bariyay.jpg",
+      "source": "bari_ye.mp4",
+      "type": "video_frame"
+    },
+    "Bay": {
+      "romanized": "Bay",
+      "urdu": "ب",
+      "webp": "Bay.webp",
+      "jpg": "Bay.jpg",
+      "source": "s0309-03bay.JPG",
+      "type": "image"
+    },
+    "Byeh": {
+      "romanized": "Byeh",
+      "urdu": "ے",
+      "webp": "Byeh.webp",
+      "jpg": "Byeh.jpg",
+      "source": "s0262-40byeh-Generated-6725.jpg",
+      "type": "image"
+    },
+    "Chay": {
+      "romanized": "Chay",
+      "urdu": "چ",
+      "webp": "Chay.webp",
+      "jpg": "Chay.jpg",
+      "source": "s0268-09chay-Generated-942.jpg",
+      "type": "image"
+    },
+    "Chotiyay": {
+      "romanized": "Chotiyay",
+      "urdu": "ی",
+      "webp": "Chotiyay.webp",
+      "jpg": "Chotiyay.jpg",
+      "source": "choti_ye.mp4",
+      "type": "video_frame"
+    },
+    "Cyeh": {
+      "romanized": "Cyeh",
+      "urdu": "ی",
+      "webp": "Cyeh.webp",
+      "jpg": "Cyeh.jpg",
+      "source": "s0307-39cyeh.JPG",
+      "type": "image"
+    },
+    "Daal": {
+      "romanized": "Daal",
+      "urdu": "ڈ",
+      "webp": "Daal.webp",
+      "jpg": "Daal.jpg",
+      "source": "s0273-13daal-Generated-4926.jpg",
+      "type": "image"
+    },
+    "Dal": {
+      "romanized": "Dal",
+      "urdu": "د",
+      "webp": "Dal.webp",
+      "jpg": "Dal.jpg",
+      "source": "s0261-12dal-Generated-5235.jpg",
+      "type": "image"
+    },
+    "Dochahay": {
+      "romanized": "Dochahay",
+      "urdu": "ح",
+      "webp": "Dochahay.webp",
+      "jpg": "Dochahay.jpg",
+      "source": "s0264-37dochahay-Generated-7530.jpg",
+      "type": "image"
+    },
+    "Fay": {
+      "romanized": "Fay",
+      "urdu": "ف",
+      "webp": "Fay.webp",
+      "jpg": "Fay.jpg",
+      "source": "s0267-27fay-Generated-483.jpg",
+      "type": "image"
+    },
+    "Gaaf": {
+      "romanized": "Gaaf",
+      "urdu": "گ",
+      "webp": "Gaaf.webp",
+      "jpg": "Gaaf.jpg",
+      "source": "s0269-30gaaf-Generated-2260-CkYD0F.jpg",
+      "type": "image"
+    },
+    "Ghain": {
+      "romanized": "Ghain",
+      "urdu": "غ",
+      "webp": "Ghain.webp",
+      "jpg": "Ghain.jpg",
+      "source": "s0274-26ghain-Generated-6088.jpg",
+      "type": "image"
+    },
+    "Hamza": {
+      "romanized": "Hamza",
+      "urdu": "ء",
+      "webp": "Hamza.webp",
+      "jpg": "Hamza.jpg",
+      "source": "s0267-38hamza-Generated-725.jpg",
+      "type": "image"
+    },
+    "Jeem": {
+      "romanized": "Jeem",
+      "urdu": "ج",
+      "webp": "Jeem.webp",
+      "jpg": "Jeem.jpg",
+      "source": "jeem.mp4",
+      "type": "video_frame"
+    },
+    "Kaf": {
+      "romanized": "Kaf",
+      "urdu": "ک",
+      "webp": "Kaf.webp",
+      "jpg": "Kaf.jpg",
+      "source": "s0304-28kaf.JPG",
+      "type": "image"
+    },
+    "Khay": {
+      "romanized": "Khay",
+      "urdu": "خ",
+      "webp": "Khay.webp",
+      "jpg": "Khay.jpg",
+      "source": "s0257-11khay-Generated-1828.jpg",
+      "type": "image"
+    },
+    "Kiaf": {
+      "romanized": "Kiaf",
+      "urdu": "ق",
+      "webp": "Kiaf.webp",
+      "jpg": "Kiaf.jpg",
+      "source": "s0268-29kiaf-Generated-1397.jpg",
+      "type": "image"
+    },
+    "Lam": {
+      "romanized": "Lam",
+      "urdu": "ل",
+      "webp": "Lam.webp",
+      "jpg": "Lam.jpg",
+      "source": "s0257-31lam-Generated-2262.jpg",
+      "type": "image"
+    },
+    "Meem": {
+      "romanized": "Meem",
+      "urdu": "م",
+      "webp": "Meem.webp",
+      "jpg": "Meem.jpg",
+      "source": "s0262-32meem-Generated-6559.jpg",
+      "type": "image"
+    },
+    "Nuun": {
+      "romanized": "Nuun",
+      "urdu": "ن",
+      "webp": "Nuun.webp",
+      "jpg": "Nuun.jpg",
+      "source": "s0275-33nuun-Generated-844.jpg",
+      "type": "image"
+    },
+    "Nuungh": {
+      "romanized": "Nuungh",
+      "urdu": "ں",
+      "webp": "Nuungh.webp",
+      "jpg": "Nuungh.jpg",
+      "source": "s0267-34nuungh-Generated-666.jpg",
+      "type": "image"
+    },
+    "Pay": {
+      "romanized": "Pay",
+      "urdu": "پ",
+      "webp": "Pay.webp",
+      "jpg": "Pay.jpg",
+      "source": "s0272-04pay-Generated-3871.jpg",
+      "type": "image"
+    },
+    "Ray": {
+      "romanized": "Ray",
+      "urdu": "ر",
+      "webp": "Ray.webp",
+      "jpg": "Ray.jpg",
+      "source": "s0269-15ray-Generated-1959.jpg",
+      "type": "image"
+    },
+    "Say": {
+      "romanized": "Say",
+      "urdu": "ث",
+      "webp": "Say.webp",
+      "jpg": "Say.jpg",
+      "source": "s0273-07say-Generated-4803.jpg",
+      "type": "image"
+    },
+    "Seen": {
+      "romanized": "Seen",
+      "urdu": "س",
+      "webp": "Seen.webp",
+      "jpg": "Seen.jpg",
+      "source": "s0257-19seen-Generated-1986.jpg",
+      "type": "image"
+    },
+    "Sheen": {
+      "romanized": "Sheen",
+      "urdu": "ش",
+      "webp": "Sheen.webp",
+      "jpg": "Sheen.jpg",
+      "source": "s0264-20sheen-Generated-7131.jpg",
+      "type": "image"
+    },
+    "Suad": {
+      "romanized": "Suad",
+      "urdu": "ص",
+      "webp": "Suad.webp",
+      "jpg": "Suad.jpg",
+      "source": "s0264-21suad-Generated-7167.jpg",
+      "type": "image"
+    },
+    "Taay": {
+      "romanized": "Taay",
+      "urdu": "ط",
+      "webp": "Taay.webp",
+      "jpg": "Taay.jpg",
+      "source": "s0267-06taay-Generated-42.jpg",
+      "type": "image"
+    },
+    "Tay": {
+      "romanized": "Tay",
+      "urdu": "ت",
+      "webp": "Tay.webp",
+      "jpg": "Tay.jpg",
+      "source": "s0304-05tay.JPG",
+      "type": "image"
+    },
+    "Tuey": {
+      "romanized": "Tuey",
+      "urdu": "ٹ",
+      "webp": "Tuey.webp",
+      "jpg": "Tuey.jpg",
+      "source": "s0269-23tuey-Generated-2117.jpg",
+      "type": "image"
+    },
+    "Wao": {
+      "romanized": "Wao",
+      "urdu": "و",
+      "webp": "Wao.webp",
+      "jpg": "Wao.jpg",
+      "source": "s0257-35wao-Generated-2357.jpg",
+      "type": "image"
+    },
+    "Zaal": {
+      "romanized": "Zaal",
+      "urdu": "ذ",
+      "webp": "Zaal.webp",
+      "jpg": "Zaal.jpg",
+      "source": "s0261-14zaal-Generated-5298.jpg",
+      "type": "image"
+    },
+    "Zaey": {
+      "romanized": "Zaey",
+      "urdu": "ض",
+      "webp": "Zaey.webp",
+      "jpg": "Zaey.jpg",
+      "source": "s0260-18zaey-Generated-4492.jpg",
+      "type": "image"
+    },
+    "Zay": {
+      "romanized": "Zay",
+      "urdu": "ز",
+      "webp": "Zay.webp",
+      "jpg": "Zay.jpg",
+      "source": "s0260-17zay-Generated-4469.jpg",
+      "type": "image"
+    },
+    "Zuad": {
+      "romanized": "Zuad",
+      "urdu": "ظ",
+      "webp": "Zuad.webp",
+      "jpg": "Zuad.jpg",
+      "source": "s0309-22zuad.JPG",
+      "type": "image"
+    },
+    "Zuey": {
+      "romanized": "Zuey",
+      "urdu": "ژ",
+      "webp": "Zuey.webp",
+      "jpg": "Zuey.jpg",
+      "source": "s0262-24zuey-Generated-6369.jpg",
+      "type": "image"
+    }
+  },
+  "total_signs": 42
+}

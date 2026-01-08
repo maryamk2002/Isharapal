@@ -7,8 +7,8 @@
  * - HTML, CSS, JS files
  */
 
-const CACHE_NAME = 'isharapal-v2';
-const CACHE_VERSION = '2.0.0';
+const CACHE_NAME = 'isharapal-v4';
+const CACHE_VERSION = '4.0.0';  // UPDATED: Force cache refresh after bug fixes
 
 // Files to cache for offline use
 const STATIC_CACHE = [
@@ -16,6 +16,8 @@ const STATIC_CACHE = [
     './index_browser.html',
     './css/main_v2.css',
     './css/urdu-fonts.css',
+    './css/analytics.css',
+    './css/innovations.css',
     './js/camera.js',
     './js/visualization.js',
     './js/ui.js',
@@ -24,10 +26,17 @@ const STATIC_CACHE = [
     './js/word_formation.js',
     './js/firebase_config.js',
     './js/cloud_sync.js',
+    './js/analytics.js',
+    './js/practice-mode.js',
+    './js/disambiguation.js',      // ADDED: Missing innovation module
+    './js/word-shortcuts.js',      // ADDED: Missing innovation module
+    './js/pip-mode.js',            // ADDED: Missing innovation module
     './js/app_browser.js',
     './models/psl_labels.json',
     './models/sign_thresholds.json',
-    './models/urdu_mapping.json'
+    './models/urdu_mapping.json',
+    './models/model_version.json',
+    './manifest.json'              // ADDED: PWA manifest
 ];
 
 // Large files to cache separately (with progress tracking)

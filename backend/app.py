@@ -237,7 +237,14 @@ def handle_connect():
         'connected_at': time.time(),
         'last_activity': time.time(),
         'frames': [],
-        'predictions': []
+        'predictions': [],
+        'prediction_history': [],  # Initialize prediction history on connect
+        'recognition_active': False,
+        'last_prediction_time': 0,
+        'last_prediction_label': None,
+        'last_prediction_confidence': 0,
+        'last_stable_prediction': None,
+        'last_stable_confidence': 0
     }
     
     logger.info(f"Client connected: {session_id}")
@@ -362,6 +369,12 @@ def handle_frame_data(data):
         })
         return
     
+    # Defensive initialization of session keys (in case of corruption)
+    if 'prediction_history' not in sessions[session_id]:
+        sessions[session_id]['prediction_history'] = []
+    if 'frames' not in sessions[session_id]:
+        sessions[session_id]['frames'] = []
+    
     try:
         start_time = time.time()
         
@@ -380,6 +393,22 @@ def handle_frame_data(data):
                 'status': 'no_hands',
                 'keypoints': None,
                 'prediction': None
+            })
+            return
+        
+        # Validate keypoints array shape before appending
+        if not isinstance(keypoints, np.ndarray):
+            logger.warning(f"Invalid keypoints type: {type(keypoints)}, expected numpy array")
+            return
+        
+        expected_dim = inference_config.MODEL_SEQUENCE_LENGTH if hasattr(inference_config, 'MODEL_SEQUENCE_LENGTH') else 189
+        # keypoints should be 1D array with feature dimension
+        if keypoints.ndim != 1 or len(keypoints) < 63:  # Minimum: 1 hand * 21 landmarks * 3 coords
+            logger.warning(f"Invalid keypoints shape: {keypoints.shape}, skipping frame")
+            emit('frame_processed', {
+                'session_id': session_id,
+                'status': 'invalid_keypoints',
+                'keypoints': None
             })
             return
         
@@ -519,9 +548,12 @@ def handle_frame_data(data):
             })
     
     except Exception as e:
-        logger.error(f"Error processing frame for session {session_id}: {e}")
+        logger.error(f"Error processing frame for session {session_id}: {e}", exc_info=True)
         performance_stats['failed_predictions'] += 1
-        emit('error', {'message': 'Frame processing failed'})
+        try:
+            emit('error', {'message': 'Frame processing failed', 'session_id': session_id})
+        except Exception as emit_error:
+            logger.error(f"Failed to emit error to client: {emit_error}")
 
 
 @socketio.on('get_session_info')

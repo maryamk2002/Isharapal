@@ -48,32 +48,72 @@ class WordFormation {
     }
     
     /**
-     * Initialize the word formation module.
+     * Initialize the word formation module with retry logic.
      * @param {string} mappingPath - Path to urdu_mapping.json
+     * @param {number} maxRetries - Maximum number of retry attempts
      */
-    async init(mappingPath = 'models/urdu_mapping.json') {
-        try {
-            console.log('[WordFormation] Loading Urdu character mapping...');
-            
-            const response = await fetch(mappingPath);
-            if (!response.ok) {
-                throw new Error(`Failed to load mapping: ${response.status}`);
+    async init(mappingPath = 'models/urdu_mapping.json', maxRetries = 3) {
+        const retryDelayMs = 1000;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[WordFormation] Loading Urdu character mapping (attempt ${attempt}/${maxRetries})...`);
+                
+                const response = await fetch(mappingPath);
+                if (!response.ok) {
+                    throw new Error(`Failed to load mapping: ${response.status}`);
+                }
+                
+                this.urduMapping = await response.json();
+                
+                console.log(`[WordFormation] Loaded ${Object.keys(this.urduMapping).length} character mappings`);
+                
+                // Start pause detection loop
+                this.startPauseDetection();
+                
+                this.isReady = true;
+                return true;
+                
+            } catch (error) {
+                console.error(`[WordFormation] Initialization attempt ${attempt} failed:`, error);
+                
+                if (attempt < maxRetries) {
+                    console.log(`[WordFormation] Retrying in ${retryDelayMs}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                } else {
+                    // All retries exhausted - use fallback default mapping
+                    console.warn('[WordFormation] All retry attempts failed, using fallback mapping');
+                    this.urduMapping = this._getDefaultMapping();
+                    
+                    if (Object.keys(this.urduMapping).length > 0) {
+                        console.log(`[WordFormation] Fallback: Using ${Object.keys(this.urduMapping).length} default mappings`);
+                        this.startPauseDetection();
+                        this.isReady = true;
+                        return true;
+                    }
+                    
+                    return false;
+                }
             }
-            
-            this.urduMapping = await response.json();
-            
-            console.log(`[WordFormation] Loaded ${Object.keys(this.urduMapping).length} character mappings`);
-            
-            // Start pause detection loop
-            this.startPauseDetection();
-            
-            this.isReady = true;
-            return true;
-            
-        } catch (error) {
-            console.error('[WordFormation] Initialization failed:', error);
-            return false;
         }
+        
+        return false;
+    }
+    
+    /**
+     * Get default Urdu mapping as fallback.
+     * @returns {Object} Default mapping object
+     */
+    _getDefaultMapping() {
+        // Minimal fallback mapping for basic functionality
+        return {
+            'Alif': 'ا',
+            'Bay': 'ب',
+            'Jeem': 'ج',
+            'Aray': 'ع',
+            '2-Hay': 'ح',
+            'Alifmad': 'آ'
+        };
     }
     
     /**
@@ -126,14 +166,18 @@ class WordFormation {
         console.log(`[WordFormation] Added letter: ${label} -> ${urduChar}`);
         console.log(`[WordFormation] Current word: ${this.getCurrentWordUrdu()}`);
         
-        // Emit letter added event
-        if (this.onLetterAdded) {
-            this.onLetterAdded({
-                letter: urduChar,
-                romanized: label,
-                currentWord: this.getCurrentWordUrdu(),
-                currentWordRomanized: this.currentWordRomanized.join('-')
-            });
+        // Emit letter added event (with type check and try-catch)
+        if (typeof this.onLetterAdded === 'function') {
+            try {
+                this.onLetterAdded({
+                    letter: urduChar,
+                    romanized: label,
+                    currentWord: this.getCurrentWordUrdu(),
+                    currentWordRomanized: this.currentWordRomanized.join('-')
+                });
+            } catch (error) {
+                console.error('[WordFormation] Error in onLetterAdded callback:', error);
+            }
         }
         
         // Update sentence display
@@ -175,19 +219,28 @@ class WordFormation {
             return;
         }
         
+        // Skip pause detection if we haven't received any predictions yet
+        if (this.lastPredictionTime === 0) {
+            return;
+        }
+        
         const now = Date.now();
         const timeSinceLastPrediction = now - this.lastPredictionTime;
         
         // Calculate pause progress (0 to 1)
         const pauseProgress = Math.min(1, timeSinceLastPrediction / this.config.pauseThresholdMs);
         
-        // Emit progress for visual indicator
-        if (this.config.showPauseIndicator && this.onPauseProgress) {
-            this.onPauseProgress({
-                progress: pauseProgress,
-                remainingMs: Math.max(0, this.config.pauseThresholdMs - timeSinceLastPrediction),
-                currentWord: this.getCurrentWordUrdu()
-            });
+        // Emit progress for visual indicator (with type check and try-catch)
+        if (this.config.showPauseIndicator && typeof this.onPauseProgress === 'function') {
+            try {
+                this.onPauseProgress({
+                    progress: Math.min(1, pauseProgress), // Cap at 1 to prevent overflow
+                    remainingMs: Math.max(0, this.config.pauseThresholdMs - timeSinceLastPrediction),
+                    currentWord: this.getCurrentWordUrdu()
+                });
+            } catch (error) {
+                console.error('[WordFormation] Error in onPauseProgress callback:', error);
+            }
         }
         
         // Check if pause threshold reached
@@ -223,13 +276,17 @@ class WordFormation {
             this.completedWords.shift();
         }
         
-        // Emit word complete event
-        if (this.onWordComplete) {
-            this.onWordComplete({
-                word: wordUrdu,
-                romanized: wordRomanized,
-                letters: [...this.currentWord]
-            });
+        // Emit word complete event (with type check and try-catch)
+        if (typeof this.onWordComplete === 'function') {
+            try {
+                this.onWordComplete({
+                    word: wordUrdu,
+                    romanized: wordRomanized,
+                    letters: [...this.currentWord]
+                });
+            } catch (error) {
+                console.error('[WordFormation] Error in onWordComplete callback:', error);
+            }
         }
         
         // Clear current word
@@ -255,6 +312,29 @@ class WordFormation {
      */
     addSpace() {
         this.forceCompleteWord();
+    }
+    
+    /**
+     * Insert a complete word directly (used by Word Shortcuts).
+     * @param {string} urduWord - The Urdu word to insert
+     */
+    insertWord(urduWord) {
+        if (!urduWord) return;
+        
+        // First, complete any current word being formed
+        this.forceCompleteWord();
+        
+        // Add the new word as a completed word
+        this.completedWords.push({
+            urdu: urduWord,
+            romanized: '[shortcut]',
+            timestamp: Date.now()
+        });
+        
+        console.log(`[WordFormation] Inserted word via shortcut: ${urduWord}`);
+        
+        // Emit update
+        this.emitSentenceUpdate();
     }
     
     /**
@@ -340,15 +420,19 @@ class WordFormation {
      * Emit sentence update event.
      */
     emitSentenceUpdate() {
-        if (this.onSentenceUpdate) {
-            this.onSentenceUpdate({
-                currentWord: this.getCurrentWordUrdu(),
-                currentWordRomanized: this.currentWordRomanized.join('-'),
-                sentence: this.getSentenceUrdu(),
-                fullText: this.getFullDisplayText(),
-                wordCount: this.completedWords.length,
-                letterCount: this.currentWord.length
-            });
+        if (typeof this.onSentenceUpdate === 'function') {
+            try {
+                this.onSentenceUpdate({
+                    currentWord: this.getCurrentWordUrdu(),
+                    currentWordRomanized: this.currentWordRomanized.join('-'),
+                    sentence: this.getSentenceUrdu(),
+                    fullText: this.getFullDisplayText(),
+                    wordCount: this.completedWords.length,
+                    letterCount: this.currentWord.length
+                });
+            } catch (error) {
+                console.error('[WordFormation] Error in onSentenceUpdate callback:', error);
+            }
         }
     }
     

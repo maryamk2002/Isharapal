@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "date": "2026-01-08",
+    "signs": 40,
+    "accuracy": "85%",
+    "description": "Pakistan Sign Language Recognition Model - Full Urdu Alphabet",
+    "architecture": "TCN-Attention",
+    "inputSize": [60, 126],
+    "changelog": [
+        "Initial release with 40 Urdu alphabet signs",
+        "Browser-only ONNX inference",
+        "Optimized for real-time performance"
+    ]
+}
+
